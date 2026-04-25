@@ -29,10 +29,12 @@ disable:
 {% for disable in kube_control_plane_node.disable %}
   - {{ disable }}
 {% endfor %}
-
+disable-cloud-controller: {{ kube_control_plane_node.disable_cloud_controller }}
 profile: "{{ global.profile }}"
 
 data-dir: {{ global.rke2_data_dir }}
+etcd-expose-metrics: {{ kube_control_plane_node.db.etcd_expose_metrics }}
+etcd-disable-snapshots: {{ kube_control_plane_node.db.etcd_disable_snapshots }}
 etcd-snapshot-schedule-cron: {{ kube_control_plane_node.db.etcd_snapshot_schedule_cron }}
 etcd-snapshot-retention: {{ kube_control_plane_node.db.etcd_snapshot_retention }}
 etcd-snapshot-compress: {{ kube_control_plane_node.db.etcd_snapshot_compress }}
@@ -43,3 +45,13 @@ service-cidr: "{{ kube_control_plane_node.service_cidr }}"
 cluster-dns: "{{ kube_control_plane_node.cluster_dns }}"
 service-node-port-range: "{{ kube_control_plane_node.service_node_port_range }}"
 cluster-domain: "{{ kube_control_plane_node.cluster_domain }}"
+
+kube-apiserver-arg:
+{% for kube_apiserver_arg in kube_control_plane_node.kube_apiserver_arg %}
+  - {{ kube_apiserver_arg }}
+{% endfor %}
+
+etcd-arg:
+{% for etcd_arg in kube_control_plane_node.etcd_arg %}
+  - {{ etcd_arg }}
+{% endfor %}

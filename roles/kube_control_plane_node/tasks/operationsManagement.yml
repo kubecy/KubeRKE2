@@ -45,9 +45,6 @@
     group: "{{ global.k8s_user.group }}"
     mode: '0660'  
 
-- name: 配置 crictl 的连接配置文件
-  template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml
-
 - name: 更新 {{ global.k8s_user.user }} 用户的 K8S 环境变量块
   blockinfile:
     path: /home/{{ global.k8s_user.user }}/.bashrc

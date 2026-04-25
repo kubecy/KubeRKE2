@@ -8,3 +8,9 @@ disable-default-registry-endpoint: {{ global.docker_repo.disable_default_registr
 system-default-registry: {{ global.docker_repo.host }}
 data-dir: {{ global.rke2_data_dir }}
 profile: "{{ global.profile }}"
+
+kubelet-arg:
+{% for kubelet_arg in kube_worker_node.kubelet_arg %}
+  - {{ kubelet_arg }}
+{% endfor %}
+

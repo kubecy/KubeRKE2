@@ -94,6 +94,9 @@
 - name: 配置 RKE2 AGENT 配置文件
   template: src=97-k8s-rke2-agent-config.yml.j2 dest={{ global.rke2_worker_dir }}/config.yaml
 
+- name: 配置 crictl 的连接配置文件
+  template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml
+
 - name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
   copy:
     src: "{{ global.ansible_dir }}/rke2_packages/"
