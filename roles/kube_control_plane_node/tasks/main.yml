@@ -1,0 +1,4 @@
+---
+- import_tasks: common.yml
+- import_tasks: deployServer.yml 
+- import_tasks: operationsManagement.yml  

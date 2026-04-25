@@ -1,0 +1,12 @@
+---
+- name: 部署 RKE2 AGENT 程序
+  shell: INSTALL_RKE2_TYPE=agent INSTALL_RKE2_ARTIFACT_PATH={{ global.software_dir }} sh {{ global.software_dir }}/install.sh
+
+- name: 启动 RKE2 AGENT
+  systemd:
+    name: rke2-agent
+    state: restarted
+    enabled: yes
+
+- name: 修改权限
+  shell: chown -R root:root /opt/cni/

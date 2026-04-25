@@ -1,0 +1,67 @@
+---
+- name: 创建 {{ global.k8s_user.group }} 组
+  group:
+    name: "{{ global.k8s_user.group }}"
+    gid: "{{ global.k8s_user.gid }}"
+    state: present
+
+- name: 创建 {{ global.k8s_user.user }} 用户, 管理 K8S 集群专用用户
+  user:
+    name: "{{ global.k8s_user.user }}"
+    uid: "{{ global.k8s_user.uid }}"
+    group: "{{ global.k8s_user.group }}"
+    state: present
+    shell: /bin/bash
+    home: /home/{{ global.k8s_user.user }}
+    password: "{{ global.k8s_user.password | password_hash('sha512') }}"
+
+- name: 创建 {{ global.k8s_user.user }} 用户的 .kube 目录
+  file:
+    path: "/home/{{ global.k8s_user.user }}/.kube"
+    state: directory
+    owner: "{{ global.k8s_user.user }}"
+    group: "{{ global.k8s_user.group }}"
+    mode: 0700
+
+- name: 复制 RKE2 的 kubeconfig 文件到到 {{ global.k8s_user.user }} 用户的 .kube 目录
+  copy:
+    src: "{{ kube_control_plane_node.write_kubeconfig }}"
+    dest: "/home/{{ global.k8s_user.user }}/.kube/config"
+    owner: "{{ global.k8s_user.user }}"
+    group: "{{ global.k8s_user.group }}"
+    mode: "{{ kube_control_plane_node.write_kubeconfig_mode }}"
+    remote_src: yes
+
+- name: 修改 kubeconfig 文件权限, 属主, 所属组
+  file:
+    path: /home/{{ global.k8s_user.user }}/.kube/config
+    owner: "{{ global.k8s_user.user }}"
+    group: "{{ global.k8s_user.group }}"
+    mode: "{{ kube_control_plane_node.write_kubeconfig_mode }}"
+
+- name: 修改 containerd socket 属于组为 {{ global.k8s_user.group }}
+  file:
+    path: /run/k3s/containerd/containerd.sock
+    group: "{{ global.k8s_user.group }}"
+    mode: '0660'  
+
+- name: 配置 crictl 的连接配置文件
+  template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml
+
+- name: 更新 {{ global.k8s_user.user }} 用户的 K8S 环境变量块
+  blockinfile:
+    path: /home/{{ global.k8s_user.user }}/.bashrc
+    marker: "# {mark} ANSIBLE K8S ENV"
+    block: |
+      PS1='\[\e[35m\]\u\[\e[m\]\[\e[97m\]\[\e[m\]\[\e[36m\]@\h\[\e[m\] \[\e[33m\]$(pwd):~\[\e[m\]\[\e[34m\] $\[\e[m\] '
+      alias k='kubectl'
+      export PATH=$PATH:{{ global.rke2_data_dir }}/bin/
+      source <(crictl completion bash)
+      source <(kubectl completion bash)
+      complete -o default -F __start_kubectl k
+    owner: "{{ global.k8s_user.user }}"
+    group: "{{ global.k8s_user.group }}"
+    mode: '0644'
+
+- name: 加载 {{ global.k8s_user.user }} 用户的环境变量
+  shell: source /home/{{ global.k8s_user.user }}/.bashrc

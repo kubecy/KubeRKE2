@@ -1,0 +1,24 @@
+---
+- name: 部署 kube_control_plane_node
+  hosts: kube_control_plane_node
+  vars_files:
+    - "{{ playbook_dir }}/../secrets_moone.yml"
+    - "{{ playbook_dir }}/../k8s_moone/site.yml"
+  become: yes
+  become_method: sudo
+  vars:
+    ansible_become_pass: "{{ servers[inventory_hostname].sudopass | b64decode }}"
+  roles:
+    - kube_control_plane_node
+
+- name: 部署 kube_worker_node
+  hosts: kube_worker_node
+  vars_files:
+    - "{{ playbook_dir }}/../secrets_moone.yml"
+    - "{{ playbook_dir }}/../k8s_moone/site.yml"
+  become: yes
+  become_method: sudo
+  vars:
+    ansible_become_pass: "{{ servers[inventory_hostname].sudopass | b64decode }}"
+  roles:
+    - kube_worker_node

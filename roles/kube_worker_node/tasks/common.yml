@@ -1,0 +1,101 @@
+---
+- name: 禁用系统 swap
+  shell: "source /etc/profile; swapoff -a && sysctl -w vm.swappiness=0"
+  ignore_errors: true
+
+- name: 删除 fstab swap 相关配置
+  lineinfile:
+    path: /etc/fstab
+    regexp: 'swap'
+    state: absent
+    backup: 'yes'
+
+- name: 关闭防火墙
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: no
+  with_items:
+    - firewalld
+  failed_when: false
+
+- name: 临时关闭 SELinux
+  shell: "setenforce 0"
+  ignore_errors: yes
+
+- name: 永久关闭 SELinux
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: 'SELINUX=disabled'
+    state: present
+
+- name: dnf 安装基础软件包
+  dnf:
+    name:
+      - bash-completion     
+      - conntrack-tools     
+      - ipset               
+      - ipvsadm             
+      - libseccomp          
+      - lvm2                
+      - nfs-utils           
+      - psmisc              
+      - rsync               
+      - socat               
+    state: present
+
+- name: 加载内核模块
+  modprobe: name={{ item }} state=present
+  with_items:
+    - br_netfilter
+    - dm_snapshot
+    - dm_thin_pool
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - nf_conntrack
+  ignore_errors: true
+
+- name: 尝试加载 nf_conntrack_ipv4
+  shell: 'modprobe nf_conntrack_ipv4 || echo "NoFound"'
+  register: NF_CONNTRACK_IPV4
+
+- name: 启用 systemd 自动加载模块服务
+  service: name=systemd-modules-load enabled=yes
+
+- name: 增加内核模块开机加载配置
+  template: src=10-k8s-rke2-modules.conf.j2 dest=/etc/modules-load.d/10-k8s-rke2-modules.conf
+
+- name: 设置系统参数
+  template: src=95-k8s-rke2-sysctl.conf.j2 dest=/etc/sysctl.d/95-k8s-rke2-sysctl.conf
+
+- name: 生效系统参数
+  shell: "source /etc/profile; sysctl -p /etc/sysctl.d/95-k8s-rke2-sysctl.conf"
+  ignore_errors: true
+
+- name: 设置系统 ulimits
+  template: src=30-k8s-rke2-ulimits.conf.j2 dest=/etc/security/limits.d/30-k8s-rke2-ulimits.conf
+
+- name: 创建 RKE2 程序, 工作, 数据目录
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  with_items:
+    - "{{ global.software_dir }}"
+    - "{{ global.rke2_worker_dir }}"
+    - "{{ global.rke2_data_dir }}"
+
+- name: 配置 RKE2 私有镜像仓库
+  template: src=96-k8s-rke2-registries.yml.j2 dest={{ global.rke2_worker_dir }}/registries.yaml
+
+- name: 配置 RKE2 AGENT 配置文件
+  template: src=97-k8s-rke2-agent-config.yml.j2 dest={{ global.rke2_worker_dir }}/config.yaml
+
+- name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
+  copy:
+    src: "{{ global.ansible_dir }}/rke2_packages/"
+    dest: "{{ global.software_dir }}"
+    mode: preserve

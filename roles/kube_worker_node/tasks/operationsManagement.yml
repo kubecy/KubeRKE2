@@ -1,0 +1,25 @@
+---
+- name: 创建 {{ global.k8s_user.group }} 组
+  group:
+    name: "{{ global.k8s_user.group }}"
+    gid: "{{ global.k8s_user.gid }}"
+    state: present
+
+- name: 创建 {{ global.k8s_user.user }} 用户, 管理 K8S 集群专用用户
+  user:
+    name: "{{ global.k8s_user.user }}"
+    uid: "{{ global.k8s_user.uid }}"
+    group: "{{ global.k8s_user.group }}"
+    state: present
+    shell: /bin/bash
+    home: /home/{{ global.k8s_user.user }}
+    password: "{{ global.k8s_user.password | password_hash('sha512') }}"
+
+- name: 修改 containerd socket 属于组为 {{ global.k8s_user.group }}
+  file:
+    path: /run/k3s/containerd/containerd.sock
+    group: "{{ global.k8s_user.group }}"
+    mode: '0660'  
+
+- name: 配置 crictl 的连接配置文件
+  template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml

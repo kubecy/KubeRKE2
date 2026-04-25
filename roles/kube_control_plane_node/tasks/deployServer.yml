@@ -1,0 +1,43 @@
+---
+- name: 部署 RKE2 SERVER 程序
+  shell: INSTALL_RKE2_TYPE=server INSTALL_RKE2_ARTIFACT_PATH={{ global.software_dir }} sh {{ global.software_dir }}/install.sh
+
+- name: 启动 RKE2 SERVER 初始化节点【首个 MASTER】
+  systemd:
+    name: rke2-server
+    state: restarted
+    enabled: yes
+  when: init_master | default(false) | bool
+
+- name: 获取集群初始化 RKE2 SERVER 节点
+  set_fact:
+    first_master_node: "{{ item }}"
+  with_items: "{{ groups.kube_control_plane_node }}"
+  when:
+    - hostvars[item].init_master is defined
+    - hostvars[item].init_master | bool
+  run_once: true
+
+- name: 等待 RKE2 SERVER 初始化, 启动 APIServer服务
+  wait_for:
+    host: "{{ hostvars[first_master_node].ansible_host }}"
+    port: 6443
+    timeout: 120
+    delay: 5
+  run_once: true
+  delegate_to: localhost
+
+- name: 修改权限
+  shell: chown -R root:root /opt/cni/
+  when: init_master | default(false) | bool
+
+- name: 启动额外的 RKE2 SERVER 服务
+  systemd:
+    name: rke2-server
+    state: restarted
+    enabled: yes
+  when: not init_master | default(false) | bool
+
+- name: 修改权限
+  shell: chown -R root:root /opt/cni/
+  when: not init_master | default(false) | bool

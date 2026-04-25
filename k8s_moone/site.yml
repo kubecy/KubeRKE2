@@ -1,0 +1,60 @@
+# 全局变量
+ssh_user: admin
+
+global:
+  ansible_dir: "{{ inventory_dir }}/.."
+  docker_repo:
+    host: "harbor.kubecy.com"
+    user: "admin"
+    password: "Harbor123@!"
+    disable_default_registry_endpoint: true
+
+  k8s_user:
+    group: kubeuser
+    gid: 2456
+    user: kubeuser
+    uid: 2456
+    password: kubeuser123@!
+
+  token: "RtMjcuJSVrbVlTBwQwisumREZWtMgH6RiKOXSsMKwAJsvGRaxaMIPOE+U6GKySQj"
+  software_dir: /app/rke2
+  rke2_worker_dir: /etc/rancher/rke2
+  rke2_data_dir: /moone/var/lib/rancher/rke2        # /var/lib/rancher/rke2
+  profile: "cis"
+
+##kubernetes节点类型配置
+kube_control_plane_node:
+
+  db:
+    user: etcd
+    uid: 2011
+    group: etcd
+    gid: 2011
+    etcd_snapshot_schedule_cron: "0 */4 * * *"
+    etcd_snapshot_retention: 15
+    etcd_snapshot_compress: true
+
+  cni: "cilium"
+  cluster_cidr: "10.244.0.0/16"
+  service_cidr: "10.96.0.0/16"
+  cluster_dns: "10.96.0.10"
+  service_node_port_range: "30000-65000"
+  cluster_domain: "cluster.local"
+
+  tls_san:
+    - 192.168.1.200  ## HA_VIP, 必须在第一行
+    - 192.168.1.61
+    - 192.168.1.62
+    - 192.168.1.63
+
+  node_taint:
+    - "node-role.kubernetes.io/control-plane=true:NoSchedule"
+
+  disable:
+    - rke2-ingress-nginx
+
+  write_kubeconfig: /etc/rancher/rke2/rke2.yaml
+  write_kubeconfig_mode: "0644"
+
+
+kube_worker_node:

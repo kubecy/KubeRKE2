@@ -1,0 +1,45 @@
+{% if not init_master | default(false) %}
+server: https://{{ kube_control_plane_node.tls_san[0] }}:9345
+{% endif %}
+
+
+token: {{ global.token }}
+node-name: {{ inventory_hostname }}
+node-ip: {{ ansible_host }} 
+
+write-kubeconfig: {{ kube_control_plane_node.write_kubeconfig }}
+write-kubeconfig-mode: {{ kube_control_plane_node.write_kubeconfig_mode }}
+
+tls-san:
+{% for ip in kube_control_plane_node.tls_san %}
+  - {{ ip }}
+{% endfor %}
+
+
+disable-default-registry-endpoint: {{ global.docker_repo.disable_default_registry_endpoint }}
+system-default-registry: {{ global.docker_repo.host }}
+
+
+node-taint:
+{% for taint in kube_control_plane_node.node_taint %}
+  - {{ taint }}
+{% endfor %}
+
+disable: 
+{% for disable in kube_control_plane_node.disable %}
+  - {{ disable }}
+{% endfor %}
+
+profile: "{{ global.profile }}"
+
+data-dir: {{ global.rke2_data_dir }}
+etcd-snapshot-schedule-cron: {{ kube_control_plane_node.db.etcd_snapshot_schedule_cron }}
+etcd-snapshot-retention: {{ kube_control_plane_node.db.etcd_snapshot_retention }}
+etcd-snapshot-compress: {{ kube_control_plane_node.db.etcd_snapshot_compress }}
+
+cni: "{{ kube_control_plane_node.cni }}"
+cluster-cidr: "{{ kube_control_plane_node.cluster_cidr }}"
+service-cidr: "{{ kube_control_plane_node.service_cidr }}"
+cluster-dns: "{{ kube_control_plane_node.cluster_dns }}"
+service-node-port-range: "{{ kube_control_plane_node.service_node_port_range }}"
+cluster-domain: "{{ kube_control_plane_node.cluster_domain }}"

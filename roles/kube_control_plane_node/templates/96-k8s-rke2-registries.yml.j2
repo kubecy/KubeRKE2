@@ -1,0 +1,13 @@
+mirrors:
+  {{ global.docker_repo.host }}:
+    endpoint:
+      - "https://{{ global.docker_repo.host }}"
+
+
+configs:
+  {{ global.docker_repo.host }}:
+    auth:
+      username: {{ global.docker_repo.user }}
+      password: {{ global.docker_repo.password }}
+    tls:
+      insecure_skip_verify: true

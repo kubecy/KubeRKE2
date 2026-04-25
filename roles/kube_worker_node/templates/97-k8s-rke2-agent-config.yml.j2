@@ -1,0 +1,10 @@
+{% if not init_master | default(false) %}
+server: https://{{ kube_control_plane_node.tls_san[0] }}:9345
+{% endif %}
+token: {{ global.token }}
+node-name: {{ inventory_hostname }}
+node-ip: {{ ansible_host }} 
+disable-default-registry-endpoint: {{ global.docker_repo.disable_default_registry_endpoint }}
+system-default-registry: {{ global.docker_repo.host }}
+data-dir: {{ global.rke2_data_dir }}
+profile: "{{ global.profile }}"
