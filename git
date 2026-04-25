@@ -7,4 +7,4 @@ msg="$(date "+%Y-%m-%d %H:%M:%S") $1"
 
 git add . &&
 git commit -m "$msg" &&
-git push  && echo "推送成功" || echo "推送失败"
+git push -u origin main && echo "推送成功" || echo "推送失败"
