@@ -12,19 +12,16 @@ IPS=(
 192.168.1.73
 )
 
-# 检查 sshpass
 if ! command -v sshpass &>/dev/null; then
     echo "请先安装 sshpass"
     exit 1
 fi
 
-# 检查本地公钥
 if [ ! -f ~/.ssh/id_rsa.pub ]; then
     echo "未检测到 SSH Key，自动生成..."
     ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
 fi
 
-# 分发公钥
 for ip in "${IPS[@]}"; do
     echo "====== $ip ======"
 
