@@ -4,7 +4,6 @@ cq-moone-master1 ansible_host=192.168.1.61 init_master=true
 cq-moone-master2 ansible_host=192.168.1.62
 cq-moone-master3 ansible_host=192.168.1.63
 
-
 ## 工作节点
 [kube_worker_node]
 cq-moone-worker1 ansible_host=192.168.1.71
