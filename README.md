@@ -119,10 +119,7 @@ echo "admin   ALL=(ALL)    ALL"  >> /etc/sudoers
 ```
 
 ## 5.2. 创建提权加密文件
-:::info
 🔔在 ansible 主机上执行
-
-:::
 
 1. 在 become: true 场景下，为不同主机动态提供 sudo 密码。
 2. 在 KubeRKE2 下创建 `secrets_moone.yml` 加密文件。
