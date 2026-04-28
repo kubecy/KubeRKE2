@@ -14,16 +14,16 @@
 
 [Releases · rancher/rke2](https://github.com/rancher/rke2/releases?page=2)
 
-:::
+1. `rke2-images.linux-amd64.tar.zst`：包含 K8s 核心组件+ 默认网络插件 Canal、Calico 等容器镜像。
+2. `rke2-images-cilium.linux-amd64.tar.gz`：仅包含 Cilium 网络插件的镜像。
+3. `rke2.linux-amd64.tar.gz`：RKE2 核心程序包。
+4. `rke2-images-all.linux-amd64.txt`：全量镜像清单。
+5. `sha256sum-amd64.txt`：记录所有包的 SHA256 哈希值，用于下载后验证文件完整性。
+6. `rancher-load-images.sh`：镜像加载辅助脚本，批量导入私有镜像仓库。
+7. `install.sh`：RKE2 一键安装脚本。
+8. `KubeRKE2`：ansible 自动化编排高效批量部署 RKE2。[GitHub - kubecy/KubeRKE2](https://github.com/kubecy/KubeRKE2)
 
-1. `**rke2-images.linux-amd64.tar.zst**`：包含 K8s 核心组件+ 默认网络插件 Canal、Calico 等容器镜像。
-2. `**rke2-images-cilium.linux-amd64.tar.gz**`：仅包含 Cilium 网络插件的镜像。
-3. `**rke2.linux-amd64.tar.gz**`：RKE2 核心程序包。
-4. `**rke2-images-all.linux-amd64.txt**`：全量镜像清单。
-5. `**sha256sum-amd64.txt**`：记录所有包的 SHA256 哈希值，用于下载后验证文件完整性。
-6. `**rancher-load-images.sh**`：镜像加载辅助脚本，批量导入私有镜像仓库。
-7. `**install.sh**`：RKE2 一键安装脚本。
-8. `**KubeRKE2**`：ansible 自动化编排高效批量部署 RKE2。[GitHub - kubecy/KubeRKE2](https://github.com/kubecy/KubeRKE2)
+
 
 
 🔔下载完成后
@@ -46,8 +46,6 @@
 另外 1-4 包移动到 KubeRKE2 目录下的` rke2_packages` 目录中
 
 如下所示：
-
-:::
 
 <img src="https://cdn.nlark.com/yuque/0/2026/png/35290775/1777091908097-3f5a9e61-849e-49d1-b895-ef0f6b2e607d.png" width="1212.7272026335281" title="" crop="0,0,1,1" id="u68d218ae" class="ne-image">
 
@@ -104,11 +102,7 @@ root@jump-server /opt/rke2-offline:~ # bash rancher-load-images.sh -l rke2-image
 5. 登录 Harbor 验证是否上传成功，一般 28 个镜像
 
 <img src="https://cdn.nlark.com/yuque/0/2026/png/35290775/1777093326907-4240c700-1b06-4e06-ad92-0d4cfd78c941.png" width="1316.3635602798715" title="" crop="0,0,1,1" id="u8e55a102" class="ne-image">
-
-:::info
-**<font style="color:#DF2A3F;">⚠️</font>****<font style="color:#DF2A3F;">注意事项</font>**：上传完成后，一定要清理本地镜像。
-
-:::
+<font style="color:#DF2A3F;">⚠️</font><font style="color:#DF2A3F;">注意事项</font>：上传完成后，一定要清理本地镜像。
 
 <img src="https://cdn.nlark.com/yuque/0/2026/png/35290775/1777093397644-6214a3f2-79ff-4aad-8278-714e6061e8eb.png" width="1295.151440293778" title="" crop="0,0,1,1" id="uf802825d" class="ne-image">
 
