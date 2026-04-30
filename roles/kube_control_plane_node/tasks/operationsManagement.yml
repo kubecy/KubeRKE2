@@ -45,6 +45,9 @@
     group: "{{ global.k8s_user.group }}"
     mode: '0660'  
 
+- name: 上传 helm 工具
+  template: src=helm dest=/usr/local/bin/helm
+
 - name: 更新 {{ global.k8s_user.user }} 用户的 K8S 环境变量块
   blockinfile:
     path: /home/{{ global.k8s_user.user }}/.bashrc
@@ -55,6 +58,7 @@
       export PATH=$PATH:{{ global.rke2_data_dir }}/bin/
       source <(crictl completion bash)
       source <(kubectl completion bash)
+      source <(helm completion bash)
       complete -o default -F __start_kubectl k
     owner: "{{ global.k8s_user.user }}"
     group: "{{ global.k8s_user.group }}"
