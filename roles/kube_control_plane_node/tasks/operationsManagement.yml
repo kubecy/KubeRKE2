@@ -46,7 +46,10 @@
     mode: '0660'  
 
 - name: 上传 helm 工具
-  template: src=helm dest=/usr/local/bin/helm
+  copy:
+    src: helm
+    dest: /usr/local/bin/helm
+    mode: '0755'
 
 - name: 更新 {{ global.k8s_user.user }} 用户的 K8S 环境变量块
   blockinfile:
