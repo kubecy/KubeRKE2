@@ -17,7 +17,7 @@ global:
   software_dir: /app/rke2                           ## RKE2 二进制包目录
   rke2_worker_dir: /etc/rancher/rke2                ## RKE2工作目录 
   rke2_data_dir: /moone/var/lib/rancher/rke2        ## 保存状态的目录 /var/lib/rancher/rke2
-  profile: ""                                       ## 基准测试验证系统配置: cis
+  profile: ""                                   ## 基准测试验证系统配置: cis
 
 ## K8S MASTER
 kube_control_plane_node:
@@ -33,7 +33,7 @@ kube_control_plane_node:
     etcd_snapshot_compress: true                    ## 压缩 etcd 快照
 
 
-  disable_kube_proxy: flase               ## 禁用 kube-proxy, 默认是：flase, 如果开启, 修改为：true 即可
+  disable_kube_proxy: false               ## 禁用 kube-proxy, 默认是：flase, 如果开启, 修改为：true 即可
   cni: "cilium"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
   cluster_cidr: "10.244.0.0/16"           ## Pod IP 的 IPv4/IPv6 网络 CIDR
   service_cidr: "10.96.0.0/16"            ## 服务 IP 的 IPv4/IPv6 网络 CIDR 

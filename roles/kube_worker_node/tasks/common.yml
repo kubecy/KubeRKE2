@@ -33,16 +33,20 @@
 - name: dnf 安装基础软件包
   dnf:
     name:
-      - bash-completion     
-      - conntrack-tools     
-      - ipset               
-      - ipvsadm             
-      - libseccomp          
-      - lvm2                
-      - nfs-utils           
-      - psmisc              
-      - rsync               
-      - socat               
+      - bash-completion
+      - conntrack-tools
+      - ipset
+      - ipvsadm
+      - libseccomp
+      - lvm2
+      - nfs-utils
+      - psmisc
+      - rsync
+      - socat
+      - ebtables
+      - bridge-utils
+      - rsyslog
+      - iproute-tc
     state: present
 
 - name: 加载内核模块
