@@ -40,16 +40,21 @@ kube_control_plane_node:
   cluster_dns: "10.96.0.10"               ## CoreDNS 服务的 IPv4 集群 IP 地址, 在服务 CIDR 范围内
   service_node_port_range: "30000-65000"  ## NodePort 可见性的服务预留端口范围
   cluster_domain: "cluster.local"         ## Kubernetes 集群的 DNS 域后缀配置项
+
   tls_san:
     - 192.168.1.200  ## HA_VIP, 必须在第一行
     - 192.168.1.61   ## RKE2 SERVER1
     - 192.168.1.62   ## RKE2 SERVER2
     - 192.168.1.63   ## RKE2 SERVER3
+
   node_taint:        ## MASTER 注册带有污点 
     - "node-role.kubernetes.io/control-plane=true:NoSchedule"
+
   disable_cloud_controller: true  ## 禁用 rke2 默认云控制器管理器
+
   disable:                        ## 禁止部署已打包的组件, 有效项: rke2-coredns, rke2-ingress-nginx, rke2-metrics-server
     - rke2-ingress-nginx
+
   write_kubeconfig: /etc/rancher/rke2/rke2.yaml
   write_kubeconfig_mode: "0644"
   
