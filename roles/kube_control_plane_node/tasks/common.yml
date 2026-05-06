@@ -43,6 +43,10 @@
       - psmisc              
       - rsync               
       - socat               
+      - ebtables
+      - bridge-utils
+      - rsyslog
+      - iproute-tc
     state: present
 
 - name: 加载内核模块
