@@ -17,7 +17,7 @@ global:
   software_dir: /app/rke2                           ## RKE2 二进制包目录
   rke2_worker_dir: /etc/rancher/rke2                ## RKE2工作目录 
   rke2_data_dir: /moone/var/lib/rancher/rke2        ## 保存状态的目录 /var/lib/rancher/rke2
-  profile: ""                                    ## 基准测试验证系统配置: cis
+  profile: ""                                       ## 基准测试验证系统配置: cis
 
 ## K8S MASTER
 kube_control_plane_node:
