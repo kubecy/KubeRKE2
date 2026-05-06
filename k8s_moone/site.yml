@@ -1,5 +1,5 @@
 ## 全局变量
-ssh_user: admin                ## SSH 远程用户, 一般禁用root，通过sudo或者su方式
+ssh_user: admin                ## SSH 远程用户, 一般禁用root, 通过sudo或者su方式
 global:
   ansible_dir: "{{ inventory_dir }}/.."
   docker_repo:
