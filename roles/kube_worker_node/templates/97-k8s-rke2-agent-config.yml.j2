@@ -14,3 +14,7 @@ kubelet-arg:
   - {{ kubelet_arg }}
 {% endfor %}
 
+kube-proxy-arg:
+{% for kube_proxy_arg in kube_worker_node.kube_proxy_arg %}
+  - {{ kube_proxy_arg }}
+{% endfor %}

@@ -43,3 +43,8 @@ etcd-arg:
 {% for etcd_arg in kube_control_plane_node.etcd_arg %}
   - {{ etcd_arg }}
 {% endfor %}
+
+kube-proxy-arg:
+{% for kube_proxy_arg in kube_control_plane_node.kube_proxy_arg %}
+  - {{ kube_proxy_arg }}
+{% endfor %}

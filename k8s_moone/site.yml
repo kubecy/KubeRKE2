@@ -65,6 +65,10 @@ kube_control_plane_node:
   kube_apiserver_arg:
     - max-requests-inflight=600
     - event-ttl=12h
+  
+  kube_proxy_arg:                             
+    - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）、'ipvs' 或 'nftables'
+
   etcd_arg:
     - auto-compaction-retention=8h
     - quota-backend-bytes=8589934592
@@ -78,3 +82,5 @@ kube_worker_node:
     - max-pods=150
 
   kube-proxy-arg:
+    - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）、'ipvs' 或 'nftables'
+    - ipvs-strict-arp=true                   ## 
