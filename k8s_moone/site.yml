@@ -68,6 +68,7 @@ kube_control_plane_node:
   
   kube_proxy_arg:                             
     - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）、'ipvs' 或 'nftables'
+    - ipvs-strict-arp=true                   ## 
 
   etcd_arg:
     - auto-compaction-retention=8h
@@ -81,6 +82,6 @@ kube_worker_node:
   kubelet_arg:
     - max-pods=150
 
-  kube-proxy-arg:
+  kube_proxy_arg:
     - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）、'ipvs' 或 'nftables'
     - ipvs-strict-arp=true                   ## 
