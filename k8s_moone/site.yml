@@ -34,7 +34,7 @@ kube_control_plane_node:
 
 
   disable_kube_proxy: false               ## 禁用 kube-proxy, 默认是：flase, 如果开启, 修改为：true 即可
-  cni: "cilium"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
+  cni: "none"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
   cluster_cidr: "10.244.0.0/16"           ## Pod IP 的 IPv4/IPv6 网络 CIDR
   service_cidr: "10.96.0.0/16"            ## 服务 IP 的 IPv4/IPv6 网络 CIDR 
   cluster_dns: "10.96.0.10"               ## CoreDNS 服务的 IPv4 集群 IP 地址, 在服务 CIDR 范围内
@@ -59,22 +59,22 @@ kube_control_plane_node:
   write_kubeconfig_mode: "0644"
   
 
-  #######################################
-  ## kubernetes 控制平面组件参数配置项 ##
-  #######################################
+#######################################
+## kubernetes 控制平面组件参数配置项 ##
+#######################################
   kube_apiserver_arg:
     - max-requests-inflight=600
     - event-ttl=12h
   
   kube_proxy_arg:                             
-    - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
-    - ipvs-strict-arp=true                   ## 用 MetalLB 时, 需要配置
+    - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
+    - ipvs-strict-arp=true                       ## 用 MetalLB 时, 需要配置
 
   etcd_arg:
     - auto-compaction-retention=8h
     - quota-backend-bytes=8589934592
     - heartbeat-interval=200
-  #######################################  
+#######################################  
     
 
 ## K8S WORKER
@@ -83,5 +83,5 @@ kube_worker_node:
     - max-pods=150
 
   kube_proxy_arg:
-    - proxy-mode=ipvs                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
-    - ipvs-strict-arp=true                   ## 使用 MetalLB 时, 需要配置
+    - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
+    - ipvs-strict-arp=true                       ## 使用 MetalLB 时, 需要配置

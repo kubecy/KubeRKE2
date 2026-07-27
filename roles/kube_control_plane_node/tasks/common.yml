@@ -19,9 +19,15 @@
     - firewalld
   failed_when: false
 
+- name: 获取 SELinux 运行模式
+  shell: getenforce
+  register: selinux_status
+  changed_when: false
+  check_mode: no
+
 - name: 临时关闭 SELinux
-  shell: "setenforce 0"
-  ignore_errors: yes
+  shell: setenforce 0
+  when: selinux_status.stdout == "Enforcing"
 
 - name: 永久关闭 SELinux
   lineinfile:

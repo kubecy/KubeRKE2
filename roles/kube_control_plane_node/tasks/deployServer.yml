@@ -27,9 +27,25 @@
   run_once: true
   delegate_to: localhost
 
-- name: 修改权限
-  shell: chown -R root:root /opt/cni/
-  when: init_master | default(false) | bool
+#- name: 修改权限
+#  shell: chown -R root:root /opt/cni/
+#  when: init_master | default(false) | bool
+#  ignore_errors: true
+
+- name: 检查是否安装 CNI 插件
+  stat:
+    path: /opt/cni
+  register: cni_dir
+
+- name: 修改 /opt/cni 权限
+  file:
+    path: /opt/cni
+    owner: root
+    group: root
+    recurse: true
+  when:
+    - init_master | default(false) | bool
+    - cni_dir.stat.exists
 
 - name: 启动额外的 RKE2 SERVER 服务
   systemd:
@@ -38,6 +54,22 @@
     enabled: yes
   when: not init_master | default(false) | bool
 
-- name: 修改权限
-  shell: chown -R root:root /opt/cni/
-  when: not init_master | default(false) | bool
+#- name: 修改权限
+#  shell: chown -R root:root /opt/cni/
+#  when: not init_master | default(false) | bool
+#  ignore_errors: true
+
+- name: 检查是否安装 CNI 插件
+  stat:
+    path: /opt/cni
+  register: cni_dir
+
+- name: 修改 /opt/cni 权限
+  file:
+    path: /opt/cni
+    owner: root
+    group: root
+    recurse: true
+  when:
+    - not init_master | default(false) | bool
+    - cni_dir.stat.exists
