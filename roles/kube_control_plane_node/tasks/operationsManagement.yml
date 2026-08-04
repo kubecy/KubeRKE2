@@ -70,6 +70,7 @@
     marker: "# {mark} ANSIBLE K8S ENV"
     block: |
       PS1='\[\e[35m\]\u\[\e[m\]\[\e[97m\]\[\e[m\]\[\e[36m\]@\h\[\e[m\] \[\e[33m\]$(pwd):~\[\e[m\]\[\e[34m\] $\[\e[m\] '
+      PROMPT_COMMAND=
       alias k='kubectl'
       export PATH=$PATH:{{ global.rke2_data_dir }}/bin/
       source <(crictl completion bash)
