@@ -39,11 +39,24 @@
     group: "{{ global.k8s_user.group }}"
     mode: "{{ kube_control_plane_node.write_kubeconfig_mode }}"
 
-- name: 修改 containerd socket 属于组为 {{ global.k8s_user.group }}
-  file:
-    path: /run/k3s/containerd/containerd.sock
-    group: "{{ global.k8s_user.group }}"
-    mode: '0660'  
+- name: 为 {{ global.k8s_user.user }} 用户配置 sudo 免密（NOPASSWD）
+  lineinfile:
+    path: /etc/sudoers.d/{{ global.k8s_user.user }}
+    line: "{{ global.k8s_user.user }}   ALL=(ALL)   NOPASSWD: ALL"
+    create: yes
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+- name: 配置 sudo secure_path 追加 RKE2 bin 目录
+  lineinfile:
+    path: /etc/sudoers.d/{{ global.k8s_user.user }}
+    line: "Defaults   secure_path = /sbin:/bin:/usr/sbin:/usr/bin:{{ global.rke2_data_dir }}/bin"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: "visudo -cf %s"
 
 - name: 上传 helm 工具
   copy:
