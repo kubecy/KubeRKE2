@@ -34,7 +34,7 @@ kube_control_plane_node:
 
 
   disable_kube_proxy: false               ## 禁用 kube-proxy, 默认是：flase, 如果开启, 修改为：true 即可
-  cni: "none"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
+  cni: "cilium"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
   cluster_cidr: "10.244.0.0/16"           ## Pod IP 的 IPv4/IPv6 网络 CIDR
   service_cidr: "10.96.0.0/16"            ## 服务 IP 的 IPv4/IPv6 网络 CIDR 
   cluster_dns: "10.96.0.10"               ## CoreDNS 服务的 IPv4 集群 IP 地址, 在服务 CIDR 范围内
