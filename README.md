@@ -118,124 +118,89 @@ echo "CsYPNMnkGNjdveZ" | passwd --stdin admin
 echo "admin   ALL=(ALL)    ALL"  >> /etc/sudoers
 ```
 
-## 5.2. 创建提权加密文件
+## 5.2. 创建提权加密文件（secrets）
 🔔在 ansible 主机上执行
 
 1. 在 become: true 场景下，为不同主机动态提供 sudo 密码。
-2. 在 KubeRKE2 下创建 `secrets_moone.yml` 加密文件。
+2. 每个环境的 secrets 加密文件位于 `inventory/<环境名>/secrets.yml`。新增环境时，用模板 `inventory/sample/secrets.yml` 加密生成：
 
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ touch secrets_moone.yml
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault encrypt secrets_moone.yml
+admin@jump-server /home/admin/app/KubeRKE2:~ $ cp inventory/sample/secrets.yml inventory/<环境名>/secrets.yml
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault encrypt inventory/<环境名>/secrets.yml
 New Vault password: 
 Confirm New Vault password: 
 Encryption successful
 ```
 
-3. 将 admin 用户密码通过 base64 编码，然后保持在加密`secrets_moone.yml`文件中，如下所示
+3. 将 admin 用户密码通过 base64 编码，然后填入加密的 `secrets.yml` 文件中，如下所示（键名必须与 hosts 中的主机名完全一致）
 
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ echo "CsYPNMnkGNjdveZ" | base64 
 Q3NZUE5NbmtHTmpkdmVaCg==
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault edit secrets_moone.yml 
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault edit inventory/<环境名>/secrets.yml 
 Vault password: 
 ---
 servers:
-  cq-moone-master1: 
-    sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
-  cq-moone-master2:
-    sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
-  cq-moone-master3:
-    sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
-  cq-moone-worker1:
-    sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
-  cq-moone-worker2:
-    sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
-  cq-moone-worker3:
+  <主机名>: 
     sudopass: "Q3NZUE5NbmtHTmpkdmVaCg=="
 ```
 
 ## 5.3. ansible 主机免密所有 K8S 主机（admin）
+🔔每个环境的 `inventory/<环境名>/ssh-copy.sh` 已随环境目录提供，自动从该环境的 hosts 解析目标主机 IP、从 site.yml 解析 SSH 用户（admin），无需修改任何配置：
+
 ```shell
-cat > ssh-copy.sh << 'EOF'
-#!/bin/bash
-USER="admin"
-IPS=(
-192.168.1.61
-192.168.1.62
-192.168.1.63
-192.168.1.71
-192.168.1.72
-192.168.1.73
-)
-check_security() {
-    if ! command -v sshpass &>/dev/null; then
-        echo "错误: 请先安装 sshpass 工具"
-        exit 1
-    fi
-
-    if [ ! -f ~/.ssh/id_rsa.pub ]; then
-        echo "信息: 未检测到 SSH Key，自动生成..."
-        ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
-        if [ $? -ne 0 ]; then
-            echo "错误: SSH Key 生成失败"
-            exit 1
-        fi
-        echo "信息: SSH Key 生成成功"
-    fi
-
-    chmod 600 ~/.ssh/id_rsa
-    chmod 644 ~/.ssh/id_rsa.pub
-}
-
-main() {
-    check_security
-    read -s -p "请输入目标主机的密码: " PASSWORD
-    echo
-    for ip in "${IPS[@]}"; do
-        echo "处理主机: $ip"
-        sshpass -p "$PASSWORD" ssh-copy-id \
-            -o StrictHostKeyChecking=accept-new \
-            -o ConnectTimeout=10 \
-            -o ServerAliveInterval=5 \
-            -o ServerAliveCountMax=3 \
-            -o PasswordAuthentication=yes \
-            ${USER}@${ip} &>/dev/null
-
-        if [ $? -eq 0 ]; then
-            echo "状态: 成功"
-        else
-            echo "状态: 失败"
-        fi
-        echo
-    done
-    unset PASSWORD
-    echo "公钥分发完成"
-}
-main
-EOF
+admin@jump-server /home/admin/app/KubeRKE2:~ $ bash inventory/cq-moone/ssh-copy.sh
+SSH 用户: admin
+将向 6 台主机分发公钥: 192.168.1.61 192.168.1.62 192.168.1.63 192.168.1.71 192.168.1.72 192.168.1.73
+请输入目标主机的密码: 
 ```
 
-# 6. 配置主机清单
+# 6. 多环境管理与主机清单
+## 6.1. 多环境结构
+inventory 目录按环境划分，每个环境目录独立维护，互不影响：hosts（主机清单）、site.yml（环境变量）、secrets.yml（加密的 sudo 密码）、ssh-copy.sh（公钥分发脚本）。
+
+```
+inventory/
+├── sample/            # 环境模板, 复制即得新环境
+│   ├── hosts          # 主机清单模板
+│   ├── site.yml       # 环境变量模板
+│   ├── secrets.yml    # 密码文件模板(明文, 需加密)
+│   └── ssh-copy.sh    # 公钥分发脚本(自动解析, 无需修改)
+├── hxjj-k45/          # hxjj-k45 环境
+└── cq-moone/          # cq-moone 环境
+```
+
+## 6.2. 新增一个环境
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ cat inventory/hosts 
+admin@jump-server /home/admin/app/KubeRKE2:~ $ cp -r inventory/sample inventory/<新环境名>
+admin@jump-server /home/admin/app/KubeRKE2:~ $ vim inventory/<新环境名>/hosts        # 修改主机清单(组名固定 rke2_server/rke2_agent, 有且仅有一台 init_master=true)
+admin@jump-server /home/admin/app/KubeRKE2:~ $ vim inventory/<新环境名>/site.yml     # 修改环境变量(IP/token/harbor/密码)
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault encrypt inventory/<新环境名>/secrets.yml  # 加密密码文件
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault edit inventory/<新环境名>/secrets.yml     # 填入各主机 sudo 密码
+admin@jump-server /home/admin/app/KubeRKE2:~ $ bash inventory/<新环境名>/ssh-copy.sh                    # 分发公钥
+```
+
+## 6.3. 配置主机清单（以 cq-moone 为例）
+```shell
+admin@jump-server /home/admin/app/KubeRKE2:~ $ cat inventory/cq-moone/hosts 
 ## control-plane, etcd节点
-[rke2-server]
+[rke2_server]
 cq-moone-master1 ansible_host=192.168.1.61 init_master=true
 cq-moone-master2 ansible_host=192.168.1.62
 cq-moone-master3 ansible_host=192.168.1.63
 
 
 ## 工作节点
-[rke2-agent]
+[rke2_agent]
 cq-moone-worker1 ansible_host=192.168.1.71
 cq-moone-worker2 ansible_host=192.168.1.72
 cq-moone-worker3 ansible_host=192.168.1.73
 ```
 
 # 7. 部署 RKE2 SERVER
+🔔`-i` 必须指向 `inventory/<环境名>/hosts` 文件（勿传目录）
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/rke2-server.yml
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-server.yml
 Vault password: 
 
 
@@ -245,7 +210,7 @@ journalctl -u rke2-server -f
 
 # 8. 部署 RKE2 AGENT
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/rke2-agent.yml 
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-agent.yml 
 Vault password: 
 
 

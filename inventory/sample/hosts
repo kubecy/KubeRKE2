@@ -1,0 +1,15 @@
+## ============================================================
+## inventory/sample - 环境模板
+## 新增环境: cp -r inventory/sample inventory/<新环境名>
+## 然后修改: hosts / site.yml / secrets.yml(加密填写)
+## ============================================================
+
+## 控制平面 (control-plane + etcd) 节点
+## 注意: 每个环境必须有且仅有一台主机标记 init_master=true（首台初始化节点）
+[rke2_server]
+# <主机名> ansible_host=<IP> init_master=true
+# <主机名> ansible_host=<IP>
+
+## 工作节点
+[rke2_agent]
+# <主机名> ansible_host=<IP>
