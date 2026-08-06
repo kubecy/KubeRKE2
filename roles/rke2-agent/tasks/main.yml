@@ -1,0 +1,3 @@
+---
+- import_tasks: deployAgent.yml 
+- import_tasks: operationsManagement.yml  

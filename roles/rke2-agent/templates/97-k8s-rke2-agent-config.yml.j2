@@ -1,0 +1,23 @@
+{% if not init_master | default(false) %}
+server: https://{{ rke2_server.tls_san[0] }}:9345
+{% endif %}
+token: {{ global.token }}
+node-name: {{ inventory_hostname }}
+node-ip: {{ ansible_host }} 
+
+disable-default-registry-endpoint: {{ global.docker_repo.disable_default_registry_endpoint }}
+system-default-registry: {{ global.docker_repo.host }}
+
+data-dir: {{ global.rke2_data_dir }}
+
+profile: "{{ global.profile }}"
+
+kubelet-arg:
+{% for kubelet_arg in rke2_agent.kubelet_arg %}
+  - {{ kubelet_arg }}
+{% endfor %}
+
+kube-proxy-arg:
+{% for kube_proxy_arg in rke2_agent.kube_proxy_arg %}
+  - {{ kube_proxy_arg }}
+{% endfor %}

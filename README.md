@@ -220,14 +220,14 @@ EOF
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ cat inventory/hosts 
 ## control-plane, etcd节点
-[kube_control_plane_node]
+[rke2-server]
 cq-moone-master1 ansible_host=192.168.1.61 init_master=true
 cq-moone-master2 ansible_host=192.168.1.62
 cq-moone-master3 ansible_host=192.168.1.63
 
 
 ## 工作节点
-[kube_worker_node]
+[rke2-agent]
 cq-moone-worker1 ansible_host=192.168.1.71
 cq-moone-worker2 ansible_host=192.168.1.72
 cq-moone-worker3 ansible_host=192.168.1.73
@@ -235,7 +235,7 @@ cq-moone-worker3 ansible_host=192.168.1.73
 
 # 7. 部署 RKE2 SERVER
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/kube_control_plane_node.yml
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/rke2-server.yml
 Vault password: 
 
 
@@ -245,7 +245,7 @@ journalctl -u rke2-server -f
 
 # 8. 部署 RKE2 AGENT
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/kube_worker_node.yml 
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook --ask-vault-pass playbooks/rke2-agent.yml 
 Vault password: 
 
 

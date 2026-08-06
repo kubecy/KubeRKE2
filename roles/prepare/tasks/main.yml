@@ -1,0 +1,8 @@
+---
+- import_tasks: common.yml
+
+- import_tasks: debian.yml
+  when: ansible_distribution_file_variety in ["Debian"]
+
+- import_tasks: redhat.yml
+  when: ansible_distribution_file_variety in ["RedHat"] or ansible_distribution in ["CentOS", "openEuler", "Rocky", "Kylin Linux Advanced Server", "Anolis OS"]

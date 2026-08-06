@@ -1,6 +1,7 @@
 ## 全局变量
 ssh_user: admin                ## SSH 远程用户, 一般禁用root, 通过sudo或者su方式
 global:
+  install_source: "online"
   ansible_dir: "{{ inventory_dir }}/.."
   docker_repo:
     host: "harbor.kubecy.com"  ## 私有镜像仓库
@@ -20,7 +21,7 @@ global:
   profile: ""                                       ## 基准测试验证系统配置: cis 根据实际场景配置
 
 ## K8S MASTER
-kube_control_plane_node:
+rke2_server:
   db:
     user: etcd
     uid: 2011
@@ -43,6 +44,7 @@ kube_control_plane_node:
 
   tls_san:
     - 192.168.1.200  ## HA_VIP, 必须在第一行
+    - 192.168.1.81
     - 192.168.1.61   ## RKE2 SERVER1
     - 192.168.1.62   ## RKE2 SERVER2
     - 192.168.1.63   ## RKE2 SERVER3
@@ -78,7 +80,7 @@ kube_control_plane_node:
     
 
 ## K8S WORKER
-kube_worker_node:
+rke2_agent:
   kubelet_arg:
     - max-pods=150
 

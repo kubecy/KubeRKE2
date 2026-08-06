@@ -1,0 +1,15 @@
+---
+- name: 更新 {{ global.k8s_user.user }} 用户的 K8S 环境变量块
+  blockinfile:
+    path: /home/{{ global.k8s_user.user }}/.bashrc
+    marker: "# {mark} ANSIBLE K8S ENV"
+    block: |
+      PS1='\[\e[35m\]\u\[\e[m\]\[\e[97m\]\[\e[m\]\[\e[36m\]@\h\[\e[m\] \[\e[33m\]$(pwd):~\[\e[m\]\[\e[34m\] $\[\e[m\] '
+      export PATH=$PATH:{{ global.rke2_data_dir }}/bin/
+      source <(crictl completion bash)
+    owner: "{{ global.k8s_user.user }}"
+    group: "{{ global.k8s_user.group }}"
+    mode: '0644'
+
+- name: 加载 {{ global.k8s_user.user }} 用户的环境变量
+  shell: source /home/{{ global.k8s_user.user }}/.bashrc

@@ -1,0 +1,51 @@
+####################################################################################
+## debian、ubuntu 系统配置                                                       ###
+####################################################################################
+
+---
+- name: apt 更新缓存刷新
+  apt: update_cache=yes cache_valid_time=72000
+  ignore_errors: true
+  when: global.install_source | default("online") != "offline"
+
+- name: 删除 ubuntu 默认安装
+  package:
+    name:
+      - ufw
+      - lxd
+      - lxcfs
+      - lxc-common
+    state: absent
+  ignore_errors: true
+
+- name: 安装 ubuntu、debian 基础软件
+  package: 
+    name:
+      - bash-completion
+      - conntrack      
+      - ipset          
+      - ipvsadm        
+      - jq             
+      - libseccomp2    
+      - lvm2           
+      - nfs-common     
+      - psmisc         
+      - rsync          
+      - socat          
+    state: present
+  when: global.install_source | default("online") != "offline"
+
+- import_tasks: offline.yml
+  when: global.install_source | default("online") != "offline"
+
+#- name: 准备 journal 日志相关目录
+#  file: name={{ item }} state=directory
+#  with_items:
+#  - "/etc/systemd/journald.conf.d"
+#  - "/var/log/journal"
+#
+#- name: 优化设置 journal 日志
+#  template: src=95-k8s-journald.conf.j2 dest=/etc/systemd/journald.conf.d/95-k8s-journald.conf
+#
+#- name: 重启 journald 服务
+#  service: name=systemd-journald state=restarted
