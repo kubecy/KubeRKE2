@@ -1,0 +1,2 @@
+*.sh text eol=lf
+rke2ctl text eol=lf

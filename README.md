@@ -122,7 +122,7 @@ echo "admin   ALL=(ALL)    ALL"  >> /etc/sudoers
 🔔在 ansible 主机上执行
 
 1. 在 become: true 场景下，为不同主机动态提供 sudo 密码。
-2. 每个环境的 secrets 加密文件位于 `inventory/<环境名>/secrets.yml`。新增环境时，用模板 `inventory/sample/secrets.yml` 加密生成：
+2. 每个环境的 secrets 加密文件位于 `inventory/<环境名>/secrets.yml`。新增环境时，用模板 `inventory/sample/secrets.yml` 加密生成（🔔也可直接用 `rke2ctl new <环境名>` 一步完成复制与加密，见 6.2.1）：
 
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ cp inventory/sample/secrets.yml inventory/<环境名>/secrets.yml
@@ -171,6 +171,30 @@ inventory/
 ```
 
 ## 6.2. 新增一个环境
+### 6.2.1. rke2ctl 一键创建（推荐）
+🔔`rke2ctl` 位于仓库根目录，自动创建环境目录并加密 secrets 文件，任意目录下均可执行：
+
+```shell
+admin@jump-server /home/admin/app/KubeRKE2:~ $ bash rke2ctl new zxjt-k99
+信息: 已创建环境 zxjt-k99: /home/admin/app/KubeRKE2/inventory/zxjt-k99
+信息: 正在加密 .../secrets.yml (请输入两遍 vault 密码)
+New Vault password:
+Confirm New Vault password:
+信息: secrets.yml 加密成功
+============================================================
+环境 zxjt-k99 创建完成, 后续步骤:
+  1. vim .../hosts         修改主机清单(组 rke2_server/rke2_agent, 仅一台 init_master=true)
+  2. vim .../site.yml      修改环境变量(IP/token/harbor/密码)
+  3. ansible-vault edit .../secrets.yml   填入各主机 sudo 密码(base64)
+  4. bash .../ssh-copy.sh  分发 SSH 公钥
+  5. rke2ctl setup zxjt-k99 rke2-server   部署 k8s-master
+     rke2ctl setup zxjt-k99 rke2-agent    部署 k8s-work
+============================================================
+```
+
+创建完成后，仍需按提示完成：修改 hosts、site.yml、`ansible-vault edit` 填入各主机密码、`bash .../ssh-copy.sh` 分发公钥。
+
+### 6.2.2. 手工流程（备选）
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ cp -r inventory/sample inventory/<新环境名>
 admin@jump-server /home/admin/app/KubeRKE2:~ $ vim inventory/<新环境名>/hosts        # 修改主机清单(组名固定 rke2_server/rke2_agent, 有且仅有一台 init_master=true)
@@ -179,6 +203,8 @@ admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault encrypt inventory/<
 admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-vault edit inventory/<新环境名>/secrets.yml     # 填入各主机 sudo 密码
 admin@jump-server /home/admin/app/KubeRKE2:~ $ bash inventory/<新环境名>/ssh-copy.sh                    # 分发公钥
 ```
+
+⚠️注意：`inventory/sample/secrets.yml` 必须保持明文模板（`servers: {}`），若误加密用 `ansible-vault decrypt inventory/sample/secrets.yml` 恢复。
 
 ## 6.3. 配置主机清单（以 cq-moone 为例）
 ```shell
@@ -198,6 +224,7 @@ cq-moone-worker3 ansible_host=192.168.1.73
 ```
 
 # 7. 部署 RKE2 SERVER
+🔔快捷方式：`bash rke2ctl setup cq-moone rke2-server`
 🔔`-i` 必须指向 `inventory/<环境名>/hosts` 文件（勿传目录）
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-server.yml
@@ -209,6 +236,7 @@ journalctl -u rke2-server -f
 ```
 
 # 8. 部署 RKE2 AGENT
+🔔快捷方式：`bash rke2ctl setup cq-moone rke2-agent`
 ```shell
 admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-agent.yml 
 Vault password: 
