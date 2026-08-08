@@ -1,5 +1,5 @@
 ---
-- name: 部署 rke2-agent
+- name: 部署 rke2-agent 服务
   hosts: rke2_agent
   vars_files:
     - "{{ inventory_dir }}/secrets.yml"
