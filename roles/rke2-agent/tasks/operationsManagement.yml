@@ -13,3 +13,5 @@
 
 - name: 加载 {{ global.k8s_user.user }} 用户的环境变量
   shell: source /home/{{ global.k8s_user.user }}/.bashrc
+  args:
+    executable: /bin/bash

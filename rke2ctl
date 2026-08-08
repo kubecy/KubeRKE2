@@ -1,14 +1,29 @@
 #!/bin/bash
 ## ============================================================
-## rke2ctl - RKE2 多环境部署管理工具
-## 用法:
-##   rke2ctl new <环境名>                             创建新部署环境(自动加密 secrets)
-##   rke2ctl setup <环境名> <rke2-server|rke2-agent>  部署 k8s-master 或 k8s-work
-##   rke2ctl help                                     显示帮助
-## 说明: 脚本自动 cd 到仓库根目录, 任意目录下均可执行
+## rke2ctl RKE2 多环境部署管理工具                          ###   
 ## ============================================================
 
-# ---------- 1. 定位仓库根目录 (兼容软链调用) ----------
+logger() {
+  TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S')
+  local FID=$(basename "${BASH_SOURCE[1]}")
+  local SOURCE="\033[35m[$FID:${BASH_LINENO[0]}]\033[0m"
+  case "$1" in
+    debug)
+      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[36mDEBUG \033[0m$2"
+      ;;
+    info)
+      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[32mINFO  \033[0m$2"
+      ;;
+    warn)
+      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[33mWARN  \033[0m$2"
+      ;;
+    error)
+      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[31mERROR \033[0m$2"
+      ;;
+    *) ;;
+  esac
+}
+
 SOURCE="${BASH_SOURCE[0]}"
 while [ -h "${SOURCE}" ]; do
   SCRIPT_DIR="$(cd -P "$(dirname "${SOURCE}")" && pwd)"
@@ -16,130 +31,290 @@ while [ -h "${SOURCE}" ]; do
   [[ "${SOURCE}" != /* ]] && SOURCE="${SCRIPT_DIR}/${SOURCE}"
 done
 REPO_ROOT="$(cd -P "$(dirname "${SOURCE}")" && pwd)"
-cd "${REPO_ROOT}" || { echo "错误: 无法进入仓库目录 ${REPO_ROOT}" >&2; exit 1; }
+cd "${REPO_ROOT}" || { logger error "无法进入仓库目录 ${REPO_ROOT}"; exit 1; }
 INVENTORY_DIR="${REPO_ROOT}/inventory"
 
-# ---------- 2. 公共函数 ----------
-err()  { echo "错误: $*" >&2; }
-info() { echo "信息: $*"; }
-
 usage() {
+  echo -e "\033[33mUsage:\033[0m ./rke2ctl <command> [args]"
   cat <<EOF
 用法:
-  rke2ctl new <环境名>                             创建新部署环境(自动加密 secrets)
-  rke2ctl setup <环境名> <rke2-server|rke2-agent>  部署 k8s-master 或 k8s-work
-  rke2ctl help                                     显示本帮助
+  ./rke2ctl help                                             显示本帮助
+  ./rke2ctl bash-completion                                  启用 tab 补全
+  ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
+  ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
 
 示例:
-  rke2ctl new zxjt-k99
-  rke2ctl setup zxjt-k99 rke2-server
-  rke2ctl setup zxjt-k99 rke2-agent
+  ./rke2ctl new zxjt-k99                                      创建部署环境
+  ./rke2ctl setup zxjt-k99 ssh-copy                           分发公钥
+  ./rke2ctl setup zxjt-k99 rke2-server                        部署 k8s-master
+  ./rke2ctl setup zxjt-k99 rke2-agent                         部署 k8s-worker
 EOF
 }
 
 valid_env_name() { [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
 
-# ---------- 3. new: 创建新环境 ----------
 cmd_new() {
-  [ "$#" -eq 1 ] || { err "new 需要 1 个参数: 环境名"; usage >&2; exit 2; }
+  [ "$#" -eq 1 ] || { logger error "new 需要 1 个参数: 环境名"; usage >&2; exit 2; }
   local env_name="$1"
 
   if ! valid_env_name "${env_name}"; then
-    err "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
+    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
     exit 2
   fi
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
   if [ -e "${env_dir}" ]; then
-    err "环境 ${env_name} 已存在: ${env_dir}"
+    logger error "环境 ${env_name} 已存在: ${env_dir}"
     exit 2
   fi
   if [ ! -d "${INVENTORY_DIR}/sample" ]; then
-    err "找不到模板目录 inventory/sample"
+    logger error "找不到模板目录 inventory/sample"
     exit 1
   fi
   command -v ansible-vault >/dev/null 2>&1 || {
-    err "未找到 ansible-vault, 请先安装 ansible"
+    logger error "未找到 ansible-vault, 请先安装 ansible"
     exit 1
   }
 
-  # 工具校验已通过, 再创建目录, 失败不留残留
-  cp -r "${INVENTORY_DIR}/sample" "${env_dir}" || { err "复制模板失败"; exit 1; }
-  info "已创建环境 ${env_name}: ${env_dir}"
+  cp -r "${INVENTORY_DIR}/sample" "${env_dir}" || { logger error "复制模板失败"; exit 1; }
+  logger info "已创建环境 ${env_name}: ${env_dir}"
 
-  info "正在加密 ${env_dir}/secrets.yml (请输入两遍 vault 密码)"
+  logger info "正在加密 ${env_dir}/secrets.yml (请输入两遍 vault 密码)"
   if ! ansible-vault encrypt "${env_dir}/secrets.yml"; then
-    err "secrets.yml 加密失败, 回滚删除环境 ${env_name}"
-    err "如需保留可手动补加密: ansible-vault encrypt ${env_dir}/secrets.yml"
+    logger error "secrets.yml 加密失败, 回滚删除环境 ${env_name}"
+    logger error "如需保留可手动补加密: ansible-vault encrypt ${env_dir}/secrets.yml"
     rm -rf "${env_dir}"
     exit 1
   fi
-  info "secrets.yml 加密成功"
+  logger info "secrets.yml 加密成功"
 
   cat <<EOF
 ============================================================
 环境 ${env_name} 创建完成, 后续步骤:
-  1. vim ${env_dir}/hosts         修改主机清单(组 rke2_server/rke2_agent, 仅一台 init_master=true)
-  2. vim ${env_dir}/site.yml      修改环境变量(IP/token/harbor/密码)
-  3. ansible-vault edit ${env_dir}/secrets.yml   填入各主机 sudo 密码(base64)
-  4. bash ${env_dir}/ssh-copy.sh  分发 SSH 公钥
-  5. rke2ctl setup ${env_name} rke2-server   部署 k8s-master
-     rke2ctl setup ${env_name} rke2-agent    部署 k8s-work
+  1. vim ${env_dir}/hosts                       配置主机清单
+  2. vim ${env_dir}/site.yml                    修改环境变量
+  3. ansible-vault edit ${env_dir}/secrets.yml  填入各主机 sudo 密码(base64)
+  4. ./rke2ctl setup ${env_name} ssh-copy       自动分发 SSH 公钥
+  5. ./rke2ctl setup ${env_name} rke2-server    部署 k8s-master
+  6. ./rke2ctl setup ${env_name} rke2-agent     部署 k8s-work
 ============================================================
 EOF
 }
 
-# ---------- 4. setup: 部署 ----------
 cmd_setup() {
-  [ "$#" -eq 2 ] || { err "setup 需要 2 个参数: 环境名 与 部署类型"; usage >&2; exit 2; }
+  [ "$#" -eq 2 ] || { logger error "setup 需要 2 个参数: 环境名 与 部署类型"; usage >&2; exit 2; }
   local env_name="$1" node_type="$2"
 
   case "${node_type}" in
-    rke2-server|rke2-agent) ;;
-    *) err "无效的部署类型: ${node_type}, 可选值: rke2-server / rke2-agent"; exit 2 ;;
+    rke2-server|rke2-agent|ssh-copy) ;;
+    *) logger error "无效的部署类型: ${node_type}, 可选值: rke2-server / rke2-agent / ssh-copy"; exit 2 ;;
   esac
 
   if ! valid_env_name "${env_name}"; then
-    err "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
+    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
     exit 2
   fi
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
   if [ ! -d "${env_dir}" ]; then
-    err "环境 ${env_name} 不存在, 请先执行: rke2ctl new ${env_name}"
+    logger error "环境 ${env_name} 不存在, 请先执行: ./rke2ctl new ${env_name}"
     exit 2
   fi
-  [ -f "${env_dir}/hosts" ] || { err "缺少 ${env_dir}/hosts, 请先修改 hosts"; exit 1; }
-  [ -f "${env_dir}/secrets.yml" ] || { err "缺少 ${env_dir}/secrets.yml, 请先加密并填入 sudo 密码"; exit 1; }
+  [ -f "${env_dir}/hosts" ] || { logger error "缺少 ${env_dir}/hosts, 请先修改 hosts"; exit 1; }
+
+  if [ "${node_type}" = "ssh-copy" ]; then
+    cmd_ssh_copy "${env_dir}"
+    exit $?
+  fi
+
+  [ -f "${env_dir}/secrets.yml" ] || { logger error "缺少 ${env_dir}/secrets.yml, 请先加密并填入 sudo 密码"; exit 1; }
 
   command -v ansible-playbook >/dev/null 2>&1 || {
-    err "未找到 ansible-playbook, 请先安装 ansible"
+    logger error "未找到 ansible-playbook, 请先安装 ansible"
     exit 1
   }
 
-  info "开始部署: ${env_name} (${node_type})"
-  info "执行: ansible-playbook -i inventory/${env_name}/hosts --ask-vault-pass playbooks/${node_type}.yml"
+  logger info "开始部署: ${env_name} (${node_type})"
+  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts --ask-vault-pass playbooks/${node_type}.yml"
 
   ansible-playbook -i "inventory/${env_name}/hosts" \
                    --ask-vault-pass "playbooks/${node_type}.yml"
   local rc=$?
   if [ "${rc}" -eq 0 ]; then
-    info "部署完成 (退出码 0)"
+    logger info "部署完成 (退出码 0)"
   else
-    err "部署失败 (退出码 ${rc}: 1=执行错误 2=主机不可达 3=解析错误 99=中断)"
+    logger error "部署失败 (退出码 ${rc}: 1=执行错误 2=主机不可达 3=解析错误 99=中断)"
   fi
   exit "${rc}"
 }
 
-# ---------- 5. 命令分发 ----------
+cmd_ssh_copy() {
+  local env_dir="$1"
+  local hosts_file="${env_dir}/hosts"
+  local site_file="${env_dir}/site.yml"
+
+  command -v sshpass >/dev/null 2>&1 || {
+    logger error "未找到 sshpass, 请先安装 (如: yum install -y sshpass)"
+    exit 1
+  }
+
+  local ssh_user
+  ssh_user="$(sed -n 's/^ssh_user:[[:space:]]*\([^ #]*\).*/\1/p' "${site_file}" | head -1)"
+  [ -z "${ssh_user}" ] && ssh_user="admin"
+
+  local master_ips=() worker_ips=() master_hosts=() worker_hosts=() group host ip
+  while read -r group host ip; do
+    case "${group}" in
+      M) master_ips+=("${ip}"); master_hosts+=("${host}") ;;
+      W) worker_ips+=("${ip}"); worker_hosts+=("${host}") ;;
+    esac
+  done < <(awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    /^[[:space:]]*\[/ { s = ($0 ~ /rke2_server/) ? "M" : (($0 ~ /rke2_agent/) ? "W" : ""); next }
+    s != "" && match($0, /ansible_host=[0-9.]+/) {
+      ip = substr($0, RSTART + 13, RLENGTH - 13)
+      if (!seen[s, ip]++) { print s, $1, ip }
+    }
+  ' "${hosts_file}")
+
+  local total=$(( ${#master_ips[@]} + ${#worker_ips[@]} ))
+  if [ "${total}" -eq 0 ]; then
+    logger error "未在 ${hosts_file} 中解析到任何主机"
+    exit 1
+  fi
+  logger info "SSH 用户: ${ssh_user}"
+  if [ "${#master_ips[@]}" -gt 0 ]; then
+    logger info "向 ${#master_ips[@]} 台 master 主机分发公钥: "
+    for ip in "${master_ips[@]}"; do
+      echo "${ip} "
+    done
+  fi
+  if [ "${#worker_ips[@]}" -gt 0 ]; then
+    logger info "向 ${#worker_ips[@]} 台 worker 主机分发公钥: "
+    for ip in "${worker_ips[@]}"; do
+      echo "${ip} "
+    done
+  fi
+
+  if [ ! -f ~/.ssh/id_rsa.pub ]; then
+    logger info "未检测到 SSH 公钥, 自动生成..."
+    ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa || { logger error "SSH 密钥生成失败"; exit 1; }
+  fi
+  chmod 600 ~/.ssh/id_rsa 2>/dev/null
+  chmod 644 ~/.ssh/id_rsa.pub 2>/dev/null
+
+  read -s -p "输入 ${ssh_user} 的主机密码: " password
+  echo
+
+  local rc=0 ip ip_pad
+  local -a group_ips group_hosts
+  for group in master worker; do
+    if [ "${group}" = "master" ]; then
+      group_ips=("${master_ips[@]}")
+      group_hosts=("${master_hosts[@]}")
+    else
+      group_ips=("${worker_ips[@]}")
+      group_hosts=("${worker_hosts[@]}")
+    fi
+    for i in "${!group_ips[@]}"; do
+      ip="${group_ips[i]}"
+      printf -v ip_pad '%-15s' "${ip}"
+      sshpass -p "${password}" ssh-copy-id \
+          -o StrictHostKeyChecking=accept-new \
+          -o ConnectTimeout=10 \
+          -o ServerAliveInterval=5 \
+          -o ServerAliveCountMax=3 \
+          -o PasswordAuthentication=yes \
+          "${ssh_user}@${ip}" >/dev/null 2>&1
+      if [ $? -eq 0 ]; then
+        logger info "分发到 ${group}：${group_hosts[i]} ${ip_pad} 分发成功"
+      else
+        logger error "分发到 ${group}：${group_hosts[i]} ${ip_pad} 分发失败"
+        rc=1
+      fi
+    done
+  done
+  unset password
+  [ "${rc}" -eq 0 ] && logger info "全部主机分发完成" || logger error "存在分发失败的主机 (退出码 ${rc})"
+  exit "${rc}"
+}
+
+cmd_install_completion() {
+  local bashrc="${HOME}/.bashrc"
+  local comp_file="${HOME}/.rke2ctl.bash"
+
+  local func_body
+  func_body="$(cat <<'FUNC'
+# rke2ctl tab 补全 (独立补全文件, 由 ~/.bashrc 加载)
+_rke2ctl() {
+  local cur envs name
+  COMPREPLY=()
+  cur="${COMP_WORDS[COMP_CWORD]}"
+
+  # 第 1 个参数: 顶层命令
+  if [ "${COMP_CWORD}" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "new setup help bash-completion" -- "${cur}") )
+    return 0
+  fi
+
+  case "${COMP_WORDS[1]}" in
+    new)
+      # new <环境名>: 创建新环境, 不做补全
+      ;;
+    setup)
+      if [ "${COMP_CWORD}" -eq 2 ]; then
+        # 环境名: inventory 下所有目录, 排除 sample 模板
+        envs=""
+        for d in "__RKE2_REPO_ROOT__"/inventory/*/; do
+          [ -d "${d}" ] || continue
+          name="$(basename "${d}")"
+          [ "${name}" = "sample" ] && continue
+          envs="${envs} ${name}"
+        done
+        COMPREPLY=( $(compgen -W "${envs}" -- "${cur}") )
+      elif [ "${COMP_CWORD}" -eq 3 ]; then
+        # 部署类型
+        COMPREPLY=( $(compgen -W "rke2-server rke2-agent ssh-copy" -- "${cur}") )
+      fi
+      ;;
+  esac
+}
+complete -F _rke2ctl ./rke2ctl rke2ctl
+FUNC
+)"
+  func_body="${func_body//__RKE2_REPO_ROOT__/${REPO_ROOT}}"
+
+  printf '%s\n' "${func_body}" > "${comp_file}" || { logger error "写入 ${comp_file} 失败"; exit 1; }
+  logger info "Tab 补全脚本已写入   ${comp_file}"
+  exec bash
+
+  if [ -f "${bashrc}" ]; then
+    grep -vF ".rke2ctl.bash" "${bashrc}" \
+      | grep -vF "rke2ctl_completion.sh" \
+      | grep -vF "complete -F _rke2ctl" \
+      | grep -vF "# rke2ctl tab 补全" \
+      | awk 'NF==0 && wasblank { next } { wasblank=(NF==0); print }' \
+      > "${bashrc}.new"
+    sed -i ':a; /^\n*$/{ $d; N; ba }' "${bashrc}.new"
+    mv "${bashrc}.new" "${bashrc}"
+  fi
+
+  printf '\n# rke2ctl tab 补全 (bash-completion)\nsource ~/.rke2ctl.bash\n' >> "${bashrc}" \
+    || { logger error "写入 ${bashrc} 失败"; exit 1; }
+  logger info "已写入 ${bashrc}"
+  echo " "
+}
+
 main() {
   local cmd="${1:-}"
+  [[ -n "${cmd}" ]] || { logger warn "缺少命令, 使用 ./rke2ctl help 查看用法"; usage; exit 0; }
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     help|-h|--help) usage; exit 0 ;;
-    "")           err "缺少命令"; usage >&2; exit 2 ;;
-    *)            err "未知命令: ${cmd}"; usage >&2; exit 2 ;;
+    bash-completion) shift; cmd_install_completion "$@" ;;
+    *)            usage; exit 0 ;;
   esac
 }
 main "$@"

@@ -118,6 +118,6 @@
 
 - name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
   copy:
-    src: "{{ global.ansible_dir }}/rke2_packages/"
+    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/"
     dest: "{{ global.software_dir }}"
     mode: preserve

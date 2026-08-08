@@ -43,7 +43,7 @@
     timeout: 120
     delay: 5
   run_once: true
-  delegate_to: localhost
+#  delegate_to: localhost
 
 - name: 检查是否安装 CNI 插件
   stat:
