@@ -204,8 +204,36 @@ cmd_ssh_copy() {
   chmod 600 ~/.ssh/id_rsa 2>/dev/null
   chmod 644 ~/.ssh/id_rsa.pub 2>/dev/null
 
-  read -s -p "输入 ${ssh_user} 的主机密码: " password
-  echo
+  # 从 secrets.yml 读取各主机 admin 密码 (servers.<主机名>.sudopass, base64 编码)
+  local secrets_file="${env_dir}/secrets.yml"
+  if [ ! -f "${secrets_file}" ]; then
+    logger error "缺少 ${secrets_file}, 请先创建并加密 (参考 inventory/sample/secrets.yml)"
+    exit 1
+  fi
+  command -v ansible-vault >/dev/null 2>&1 || {
+    logger error "未找到 ansible-vault, 请先安装 ansible"
+    exit 1
+  }
+  logger info "正在解密 ${secrets_file} (请输入 vault 密码)"
+  local vault_text
+  vault_text="$(ansible-vault view "${secrets_file}" 2>/dev/null)" || {
+    logger error "secrets.yml 解密失败, 请检查 vault 密码"
+    exit 1
+  }
+
+  # 解析 servers.<主机名>.sudopass (base64) → host_pass_b64[主机名]
+  local -A host_pass_b64=()
+  local cur_host="" line
+  local re_host="^[[:space:]]{2}[A-Za-z0-9_.-]+:[[:space:]]*$"
+  local re_sudopass="^[[:space:]]{4}sudopass:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ${re_host} ]]; then
+      cur_host="${line//[[:space:]]/}"
+      cur_host="${cur_host%:}"
+    elif [[ -n "${cur_host}" && "${line}" =~ ${re_sudopass} ]]; then
+      host_pass_b64["${cur_host}"]="${BASH_REMATCH[1]}"
+    fi
+  done <<< "${vault_text}"
 
   local rc=0 ip ip_pad
   local -a group_ips group_hosts
@@ -219,6 +247,15 @@ cmd_ssh_copy() {
     fi
     for i in "${!group_ips[@]}"; do
       ip="${group_ips[i]}"
+      local host="${group_hosts[i]}"
+      local b64="${host_pass_b64[${host}]}"
+      if [ -z "${b64}" ]; then
+        logger error "secrets.yml 中缺少主机 ${host} 的 sudopass"
+        rc=1
+        continue
+      fi
+      local password
+      password="$(printf '%s' "${b64}" | base64 -d)"
       printf -v ip_pad '%-15s' "${ip}"
       sshpass -p "${password}" ssh-copy-id \
           -o StrictHostKeyChecking=accept-new \
@@ -228,9 +265,9 @@ cmd_ssh_copy() {
           -o PasswordAuthentication=yes \
           "${ssh_user}@${ip}" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
-        logger info "分发到 ${group}：${group_hosts[i]} ${ip_pad} 分发成功"
+        logger info "分发到 ${group}：${host} ${ip_pad} 分发成功"
       else
-        logger error "分发到 ${group}：${group_hosts[i]} ${ip_pad} 分发失败"
+        logger error "分发到 ${group}：${host} ${ip_pad} 分发失败"
         rc=1
       fi
     done
