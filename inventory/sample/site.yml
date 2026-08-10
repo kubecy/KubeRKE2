@@ -66,28 +66,28 @@ rke2_server:
   write_kubeconfig_mode: "0644"
   
 
-control_plane_resource_requests:   ## 控制平面资源请求
-  - kube-apiserver-cpu=2000m
-  - kube-apiserver-memory=4Gi
-  - etcd-cpu=2000m
-  - etcd-memory=4Gi
-  - kube-controller-manager-cpu=1000m
-  - kube-controller-manager-memory=2Gi
-  - kube-scheduler-cpu=500m
-  - kube-scheduler-memory=1Gi
-  - kube-proxy-cpu=500m
-  - kube-proxy-memory=512Mi
-control_plane_resource_limits:     ## 控制平面资源上限
-  - kube-apiserver-cpu=2000m
-  - kube-apiserver-memory=4Gi
-  - etcd-cpu=2000m
-  - etcd-memory=4Gi
-  - kube-controller-manager-cpu=1000m
-  - kube-controller-manager-memory=2Gi
-  - kube-scheduler-cpu=500m
-  - kube-scheduler-memory=1Gi
-  - kube-proxy-cpu=500m
-  - kube-proxy-memory=512Mi
+  control_plane_resource_requests:   ## 控制平面资源请求
+    - kube-apiserver-cpu=2000m
+    - kube-apiserver-memory=4Gi
+    - etcd-cpu=2000m
+    - etcd-memory=4Gi
+    - kube-controller-manager-cpu=1000m
+    - kube-controller-manager-memory=2Gi
+    - kube-scheduler-cpu=500m
+    - kube-scheduler-memory=1Gi
+    - kube-proxy-cpu=500m
+    - kube-proxy-memory=512Mi
+  control_plane_resource_limits:     ## 控制平面资源上限
+    - kube-apiserver-cpu=2000m
+    - kube-apiserver-memory=4Gi
+    - etcd-cpu=2000m
+    - etcd-memory=4Gi
+    - kube-controller-manager-cpu=1000m
+    - kube-controller-manager-memory=2Gi
+    - kube-scheduler-cpu=500m
+    - kube-scheduler-memory=1Gi
+    - kube-proxy-cpu=500m
+    - kube-proxy-memory=512Mi
 
 ## kubernetes 控制平面组件参数配置项
   kube_apiserver_arg:
