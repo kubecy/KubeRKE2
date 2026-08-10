@@ -1,4 +1,6 @@
-## 全局变量
+##============================================================================= 
+##                                   全局变量                                ##
+##=============================================================================
 ssh_user: admin                ## SSH 远程用户, 一般禁用root, 通过sudo或者su方式
 global:
   install_source: "online"
@@ -19,9 +21,11 @@ global:
   software_dir: /app/rke2                           ## RKE2 二进制包目录
   rke2_worker_dir: /etc/rancher/rke2                ## RKE2工作目录 
   rke2_data_dir: /moone/var/lib/rancher/rke2        ## 保存状态的目录 /var/lib/rancher/rke2
-  profile: ""                                       ## 基准测试验证系统配置: cis 根据实际场景配置
+  profile: ""                                       ## 基准测试验证系统配置: cis 根据实际情况配置
 
-## K8S MASTER
+##============================================================================= 
+##                                K8S MASTER                                 ##
+##============================================================================= 
 rke2_server:
   db:
     user: etcd
@@ -62,25 +66,44 @@ rke2_server:
   write_kubeconfig_mode: "0644"
   
 
-#######################################
-## kubernetes 控制平面组件参数配置项 ##
-#######################################
+control_plane_resource_requests:   ## 控制平面资源请求
+  - kube-apiserver-cpu=2000m
+  - kube-apiserver-memory=4Gi
+  - etcd-cpu=2000m
+  - etcd-memory=4Gi
+  - kube-controller-manager-cpu=1000m
+  - kube-controller-manager-memory=2Gi
+  - kube-scheduler-cpu=500m
+  - kube-scheduler-memory=1Gi
+  - kube-proxy-cpu=500m
+  - kube-proxy-memory=512Mi
+control_plane_resource_limits:     ## 控制平面资源上限
+  - kube-apiserver-cpu=2000m
+  - kube-apiserver-memory=4Gi
+  - etcd-cpu=2000m
+  - etcd-memory=4Gi
+  - kube-controller-manager-cpu=1000m
+  - kube-controller-manager-memory=2Gi
+  - kube-scheduler-cpu=500m
+  - kube-scheduler-memory=1Gi
+  - kube-proxy-cpu=500m
+  - kube-proxy-memory=512Mi
+
+## kubernetes 控制平面组件参数配置项
   kube_apiserver_arg:
     - max-requests-inflight=600
     - event-ttl=12h
-  
   kube_proxy_arg:                             
     - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
     - ipvs-strict-arp=true                       ## 用 MetalLB 时, 需要配置
-
   etcd_arg:
     - auto-compaction-retention=8h
     - quota-backend-bytes=8589934592
     - heartbeat-interval=200
-#######################################  
-    
 
-## K8S WORKER
+##============================================================================= 
+##                                K8S WORKER                                 ##
+##============================================================================= 
 rke2_agent:
   kubelet_arg:
     - max-pods=150

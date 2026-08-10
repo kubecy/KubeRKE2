@@ -45,6 +45,16 @@ cluster-dns: "{{ rke2_server.cluster_dns }}"
 service-node-port-range: "{{ rke2_server.service_node_port_range }}"
 cluster-domain: "{{ rke2_server.cluster_domain }}"
 
+control-plane-resource-requests:
+{% for control_plane_resource_requests in rke2_server.control_plane_resource_requests%}
+  - {{ control_plane_resource_requests }}
+{% endfor %}
+
+control-plane-resource-limits:
+{% for control_plane_resource_limits in rke2_server.control_plane_resource_limits %}
+  - {{ control_plane_resource_requests }}
+{% endfor %}
+
 kube-apiserver-arg:
 {% for kube_apiserver_arg in rke2_server.kube_apiserver_arg %}
   - {{ kube_apiserver_arg }}
