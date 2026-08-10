@@ -66,7 +66,7 @@ rke2_server:
   write_kubeconfig_mode: "0644"
   
 
-  control_plane_resource_requests:   ## 控制平面资源请求
+  control_plane_resource_requests:   ## 控制平面资源请求(3+150)
     - kube-apiserver-cpu=2000m
     - kube-apiserver-memory=4Gi
     - etcd-cpu=2000m
@@ -77,7 +77,7 @@ rke2_server:
     - kube-scheduler-memory=1Gi
     - kube-proxy-cpu=500m
     - kube-proxy-memory=512Mi
-  control_plane_resource_limits:     ## 控制平面资源上限
+  control_plane_resource_limits:     ## 控制平面资源上限(3+150)
     - kube-apiserver-cpu=2000m
     - kube-apiserver-memory=4Gi
     - etcd-cpu=2000m
