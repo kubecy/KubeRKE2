@@ -225,9 +225,9 @@ cq-moone-worker3 ansible_host=192.168.1.73
 
 # 7. 部署 RKE2 SERVER
 🔔快捷方式：`bash rke2ctl setup cq-moone rke2-server`
-🔔`-i` 必须指向 `inventory/<环境名>/hosts` 文件（勿传目录）
+🔔`-i` 必须指向 `inventory/<环境名>/hosts` 文件（勿传目录）；`-e env_dir` 必须传 `inventory/<环境名>` 的**绝对路径**（相对路径会被静默跳过，vars_files 加载不到）
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-server.yml
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass -e env_dir=$PWD/inventory/cq-moone playbooks/rke2-server.yml
 Vault password: 
 
 
@@ -238,7 +238,7 @@ journalctl -u rke2-server -f
 # 8. 部署 RKE2 AGENT
 🔔快捷方式：`bash rke2ctl setup cq-moone rke2-agent`
 ```shell
-admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass playbooks/rke2-agent.yml 
+admin@jump-server /home/admin/app/KubeRKE2:~ $ ansible-playbook -i inventory/cq-moone/hosts --ask-vault-pass -e env_dir=$PWD/inventory/cq-moone playbooks/rke2-agent.yml 
 Vault password: 
 
 

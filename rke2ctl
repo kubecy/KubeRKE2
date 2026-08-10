@@ -135,10 +135,10 @@ cmd_setup() {
   }
 
   logger info "开始部署: ${env_name} (${node_type})"
-  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts --ask-vault-pass playbooks/${node_type}.yml"
+  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts --ask-vault-pass -e env_dir=${env_dir} playbooks/${node_type}.yml"
 
   ansible-playbook -i "inventory/${env_name}/hosts" \
-                   --ask-vault-pass "playbooks/${node_type}.yml"
+                   --ask-vault-pass -e "env_dir=${env_dir}" "playbooks/${node_type}.yml"
   local rc=$?
   if [ "${rc}" -eq 0 ]; then
     logger info "部署完成 (退出码 0)"
@@ -324,7 +324,6 @@ FUNC
 
   printf '%s\n' "${func_body}" > "${comp_file}" || { logger error "写入 ${comp_file} 失败"; exit 1; }
   logger info "Tab 补全脚本已写入   ${comp_file}"
-  exec bash
 
   if [ -f "${bashrc}" ]; then
     grep -vF ".rke2ctl.bash" "${bashrc}" \
@@ -345,7 +344,7 @@ FUNC
 
 main() {
   local cmd="${1:-}"
-  [[ -n "${cmd}" ]] || { logger warn "缺少命令, 使用 ./rke2ctl help 查看用法"; usage; exit 0; }
+  [[ -n "${cmd}" ]] || { logger warn "缺少命令, 可参考以下步骤:"; usage; exit 0; }
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
@@ -355,3 +354,4 @@ main() {
   esac
 }
 main "$@"
+exec bash

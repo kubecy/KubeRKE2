@@ -2,8 +2,8 @@
 - name: 部署 rke2-server 服务
   hosts: rke2_server
   vars_files:
-    - "{{ inventory_dir }}/secrets.yml"
-    - "{{ inventory_dir }}/site.yml"
+    - "{{ env_dir }}/secrets.yml"
+    - "{{ env_dir }}/site.yml"
   become: yes
   become_method: sudo
   vars:
