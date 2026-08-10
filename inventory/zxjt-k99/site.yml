@@ -66,7 +66,7 @@ rke2_server:
   write_kubeconfig_mode: "0644"
   
 
-  control_plane_resource_requests:   ## 控制平面资源请求, 根据实际集群规模配置, 
+  control_plane_resource_requests:   ## 控制平面资源请求, 根据实际集群规模配置, 一般requests和limits配置参数一样或者按照1.2～1.5倍给。 
     - kube-apiserver-cpu=500m
     - kube-apiserver-memory=1024M
     - etcd-cpu=1000m

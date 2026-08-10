@@ -52,7 +52,7 @@ control-plane-resource-requests:
 
 control-plane-resource-limits:
 {% for control_plane_resource_limits in rke2_server.control_plane_resource_limits %}
-  - {{ control_plane_resource_requests }}
+  - {{ control_plane_resource_limits }}
 {% endfor %}
 
 kube-apiserver-arg:
