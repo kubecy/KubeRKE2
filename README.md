@@ -1,16 +1,35 @@
-# 				**Moone-K45 容器云底座平台建设**
+# 				**zxjt-k99 容器云底座平台建设**
 
 
 
 # 1. 服务器与网络规划
 
-
+| 节点角色             | 主机名           | IP           | CPU(核) | 内存(G) | 系统盘(G) | 数据盘(G)     |
+| -------------------- | ---------------- | ------------ | ------- | ------- | --------- | ------------- |
+| master+etcd          | zxjt-k99-master1 | 192.168.1.11 | 16      | 32      | 100       | 500、100、100 |
+| master+etcd          | zxjt-k99-master2 | 192.168.1.12 | 16      | 32      | 100       | 500、100、100 |
+| master+etcd          | zxjt-k99-master3 | 192.168.1.13 | 16      | 32      | 100       | 500、100、100 |
+| keepalived + haproxy | zxjt-k99-lb1     | 192.168.1.16 | 4       | 8       | 100       |               |
+| keepalived + haproxy | zxjt-k99-lb2     | 192.168.1.17 | 4       | 8       | 100       |               |
+| harbor               | zxjt-k99-harbor1 | 192.168.1.18 | 8       | 16      | 100       | 1024          |
+| worker               | zxjt-k99-worker1 | 192.168.1.21 | 32      | 64      | 100       | 500、100、100 |
+| worker               | zxjt-k99-worker2 | 192.168.1.22 | 32      | 64      | 100       | 500、100、100 |
+| .........            |                  |              |         |         |           |               |
+| ha-vip               |                  | 192.168.1.20 |         |         |           |               |
 
 # 2. 离线资源准备（在外网机器执行）
 
 🔔下载 RKE2`v1.34.6+rke2r3`版本，在可访问外网的跳板机或者自己的笔记本上执行，然后统一打包，拷贝到企业内网。
 
 [Releases · rancher/rke2](https://github.com/rancher/rke2/releases?page=2)
+
+⚡快速下载（指定环境名，自动读取该环境 site.yml 的 `rke2_version`、`arch` 与 `rke2_server.cni`，下载对应版本、架构和 CNI 镜像包至 `packages_rke2/<环境名>/<版本>_<架构>/`）：
+
+```shell
+./rke2ctl download zxjt-k99     # 按 zxjt-k99 的 rke2_version/arch/cni 配置下载
+```
+
+或手动下载以下文件：
 
 1. `rke2-images.linux-amd64.tar.zst`：包含 K8s 核心组件+ 默认网络插件 Canal、Calico 等容器镜像。
 2. `rke2-images-cilium.linux-amd64.tar.gz`：仅包含 Cilium 网络插件的镜像。

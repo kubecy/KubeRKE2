@@ -42,12 +42,14 @@ usage() {
   ./rke2ctl bash-completion                                  启用 tab 补全
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
+  ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>_<架构>/, rke2_version/arch/cni 均读环境 site.yml
 
 示例:
   ./rke2ctl new zxjt-k99                                      创建部署环境
   ./rke2ctl setup zxjt-k99 ssh-copy                           分发公钥
   ./rke2ctl setup zxjt-k99 rke2-server                        部署 k8s-master
   ./rke2ctl setup zxjt-k99 rke2-agent                         部署 k8s-worker
+  ./rke2ctl download zxjt-k99                                 按 zxjt-k99 的 rke2_version/arch/cni 配置下载
 EOF
 }
 
@@ -291,13 +293,26 @@ _rke2ctl() {
 
   # 第 1 个参数: 顶层命令
   if [ "${COMP_CWORD}" -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "new setup help bash-completion" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "new setup download help bash-completion" -- "${cur}") )
     return 0
   fi
 
   case "${COMP_WORDS[1]}" in
     new)
       # new <环境名>: 创建新环境, 不做补全
+      ;;
+    download)
+      if [ "${COMP_CWORD}" -eq 2 ]; then
+        # 第 2 参数: 环境名
+        envs=""
+        for d in "__RKE2_REPO_ROOT__"/inventory/*/; do
+          [ -d "${d}" ] || continue
+          name="$(basename "${d}")"
+          [ "${name}" = "sample" ] && continue
+          envs="${envs} ${name}"
+        done
+        COMPREPLY=( $(compgen -W "${envs}" -- "${cur}") )
+      fi
       ;;
     setup)
       if [ "${COMP_CWORD}" -eq 2 ]; then
@@ -342,12 +357,134 @@ FUNC
   echo " "
 }
 
+cmd_download() {
+  # 参数: 环境名; rke2_version/arch/cni 均取自该环境 site.yml
+  [ "$#" -eq 1 ] || {
+    logger error "download 需要 1 个参数: 环境名"
+    usage >&2; exit 2
+  }
+  local env_name="$1"
+  local version arch_cfg cni
+  local arch_linux arch_short version_urlsafe dest_dir site_file
+
+  if ! valid_env_name "${env_name}"; then
+    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
+    exit 2
+  fi
+  site_file="${INVENTORY_DIR}/${env_name}/site.yml"
+  [ -f "${site_file}" ] || {
+    logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name} 或指定已有环境名"
+    exit 1
+  }
+
+  # 解析顶层 rke2_version / arch 与 rke2_server.cni (兼容带引号与注释)
+  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
+  arch_cfg="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
+              | head -1 | tr 'A-Z' 'a-z')"
+  cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
+         | head -1 | tr 'A-Z' 'a-z')"
+  logger info "环境 ${env_name} 配置: rke2_version=${version:-空} arch=${arch_cfg:-空} cni=${cni:-none}"
+
+  # 版本格式校验 (如 v1.34.6+rke2r3, 兼容 hotfix 后缀)
+  if ! [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\+rke2r[0-9]+(\.[0-9a-zA-Z]+)*$ ]]; then
+    logger error "site.yml 中缺少合法的 rke2_version: ${version:-空} (示例: v1.34.6+rke2r3)"
+    exit 2
+  fi
+  version_urlsafe="${version//+/%2B}"   # GitHub URL 中 + 必须编码为 %2B
+
+  # 架构映射 (amd/arm 简写 -> amd64/arm64)
+  case "${arch_cfg}" in
+    amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
+    arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
+    *) logger error "site.yml 中 arch 配置非法: ${arch_cfg:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+  esac
+
+  # 目标目录 packages_rke2/<环境名>/<版本>_<架构>/
+  dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}_${arch_short}"
+  mkdir -p "${dest_dir}" || { logger error "创建目录失败: ${dest_dir}"; exit 1; }
+
+  # 必下文件清单
+  local -a files=(
+    "install.sh"
+    "rancher-load-images.sh"
+    "rke2.${arch_linux}.tar.gz"
+    "sha256sum-${arch_short}.txt"
+    "rke2-images-all.${arch_linux}.txt"
+    "rke2-images.${arch_linux}.tar.gz"
+  )
+  # 按 cni 值追加对应的 CNI 镜像包 (.tar.gz + .txt)
+  case "${cni}" in
+    *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz" "rke2-images-cilium.${arch_linux}.txt") ;;
+    *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz"  "rke2-images-canal.${arch_linux}.txt")  ;;
+    *calico*) files+=("rke2-images-calico.${arch_linux}.tar.gz" "rke2-images-calico.${arch_linux}.txt") ;;
+  esac
+
+  # 下载阶段 (已存在且非空则跳过, 完整性由校验阶段兜底)
+  local file url
+  for file in "${files[@]}"; do
+    case "${file}" in
+      install.sh)
+        url="https://get.rke2.io" ;;
+      rancher-load-images.sh)
+        url="https://github.com/rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
+      *)
+        url="https://github.com/rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
+    esac
+
+    if [ -s "${dest_dir}/${file}" ]; then
+      logger info "已存在, 跳过下载: ${file}"
+      continue
+    fi
+    logger info "正在下载: ${file}"
+    if ! curl -fL --retry 3 --retry-delay 2 --retry-all-errors \
+         -o "${dest_dir}/${file}" "${url}"; then
+      rm -f "${dest_dir}/${file}"   # 删除残file, 保证下次重下完整
+      logger error "下载失败: ${file} (${url})"
+      exit 1
+    fi
+  done
+
+  # 校验阶段 (sha256sum 文件条目格式: "hash  文件名" 双空格)
+  local checksums="${dest_dir}/sha256sum-${arch_short}.txt"
+  [ -f "${checksums}" ] || { logger error "缺少校验文件 ${checksums}"; exit 1; }
+  local expected actual fail=0
+  for file in "${files[@]}"; do
+    expected="$(grep -F "  ${file}" "${checksums}" | head -1 | awk '{print $1}')"
+    if [ -z "${expected}" ]; then
+      # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
+      if [ -s "${dest_dir}/${file}" ]; then
+        logger info "非空检查通过: ${file}"
+      else
+        logger error "文件缺失或为空: ${file}"
+        fail=1
+      fi
+      continue
+    fi
+    actual="$(sha256sum "${dest_dir}/${file}" | awk '{print $1}')"
+    if [ "${actual}" = "${expected}" ]; then
+      logger info "校验通过: ${file}"
+    else
+      logger error "校验失败: ${file} (期望 ${expected}, 实际 ${actual})"
+      logger error "请删除后重下: rm -f '${dest_dir}/${file}'"
+      fail=1
+    fi
+  done
+
+  if [ "${fail}" -eq 0 ]; then
+    logger info "全部下载完成并校验通过: ${dest_dir}"
+  else
+    logger error "存在失败项, 修复后重跑: ./rke2ctl download ${env_name}"
+    exit 1
+  fi
+}
+
 main() {
   local cmd="${1:-}"
   [[ -n "${cmd}" ]] || { logger warn "缺少命令, 可参考以下步骤:"; usage; exit 0; }
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
+    d|download)   shift; cmd_download "$@" ;;
     help|-h|--help) usage; exit 0 ;;
     bash-completion) shift; cmd_install_completion "$@" ;;
     *)            usage; exit 0 ;;

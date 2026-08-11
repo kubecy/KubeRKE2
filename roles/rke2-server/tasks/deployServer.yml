@@ -18,7 +18,7 @@
   template: src=97-k8s-rke2-server-config.yml.j2 dest={{ global.rke2_worker_dir }}/config.yaml
 
 - name: 部署 RKE2 SERVER 程序
-  shell: INSTALL_RKE2_TYPE=server INSTALL_RKE2_ARTIFACT_PATH={{ global.software_dir }} sh {{ global.software_dir }}/install.sh
+  shell: INSTALL_RKE2_TYPE=server INSTALL_RKE2_VERSION={{ rke2_version }} INSTALL_RKE2_ARTIFACT_PATH={{ global.software_dir }} sh {{ global.software_dir }}/install.sh
 
 - name: 启动 RKE2 SERVER 初始化节点【首个 MASTER】
   systemd:
