@@ -42,7 +42,7 @@ usage() {
   ./rke2ctl bash-completion                                  启用 tab 补全
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
-  ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>_<架构>/, rke2_version/arch/cni 均读环境 site.yml
+  ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
 
 示例:
   ./rke2ctl new zxjt-k99                                      创建部署环境
@@ -399,8 +399,8 @@ cmd_download() {
     *) logger error "site.yml 中 arch 配置非法: ${arch_cfg:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
   esac
 
-  # 目标目录 packages_rke2/<环境名>/<版本>_<架构>/
-  dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}_${arch_short}"
+  # 目标目录 packages_rke2/<环境名>/<版本>/<架构>/ (架构目录用规范形式: amd64/arm64)
+  dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}/${arch_short}"
   mkdir -p "${dest_dir}" || { logger error "创建目录失败: ${dest_dir}"; exit 1; }
 
   # 必下文件清单

@@ -122,16 +122,16 @@
 
 - name: 校验离线包目录包含 {{ rke2_arch_suffix }} 架构的二进制包
   stat:
-    path: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}_{{ rke2_arch_suffix }}/rke2.linux-{{ rke2_arch_suffix }}.tar.gz"
+    path: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/rke2.linux-{{ rke2_arch_suffix }}.tar.gz"
   register: rke2_arch_pkg
 
 - name: 提示缺少对应架构的离线包
   fail:
-    msg: "缺少 {{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}_{{ rke2_arch_suffix }}/ 下 {{ arch }} 架构的 rke2.linux-{{ rke2_arch_suffix }}.tar.gz, 请先执行 ./rke2ctl download {{ env_dir | basename }}"
+    msg: "缺少 {{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/ 下 {{ arch }} 架构的 rke2.linux-{{ rke2_arch_suffix }}.tar.gz, 请先执行 ./rke2ctl download {{ env_dir | basename }}"
   when: not rke2_arch_pkg.stat.exists
 
 - name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
   copy:
-    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}_{{ rke2_arch_suffix }}/"
+    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/"
     dest: "{{ global.software_dir }}"
     mode: preserve

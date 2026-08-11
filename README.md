@@ -23,7 +23,7 @@
 
 [Releases · rancher/rke2](https://github.com/rancher/rke2/releases?page=2)
 
-⚡快速下载（指定环境名，自动读取该环境 site.yml 的 `rke2_version`、`arch` 与 `rke2_server.cni`，下载对应版本、架构和 CNI 镜像包至 `packages_rke2/<环境名>/<版本>_<架构>/`）：
+⚡快速下载（指定环境名，自动读取该环境 site.yml 的 `rke2_version`、`arch` 与 `rke2_server.cni`，下载对应版本、架构和 CNI 镜像包至 `packages_rke2/<环境名>/<版本>/<架构>/`）：
 
 ```shell
 ./rke2ctl download zxjt-k99     # 按 zxjt-k99 的 rke2_version/arch/cni 配置下载
