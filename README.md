@@ -4,9 +4,7 @@
 
 # 1. 服务器与网络规划
 
-<img src="https://cdn.nlark.com/yuque/0/2026/png/35290775/1777089611925-3c8ca523-7e14-4627-9fdc-854b8f65c355.png" width="1438.7877956281839" title="" crop="0,0,1,1" id="u480b4bfc" class="ne-image">
 
-<img src="https://cdn.nlark.com/yuque/0/2026/png/35290775/1777089401575-41bbe32a-35eb-413d-9ed5-9fe749f99d9e.png" width="1466.06052132459" title="" crop="0,0,1,1" id="u57d5b827" class="ne-image">
 
 # 2. 离线资源准备（在外网机器执行）
 

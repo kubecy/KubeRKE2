@@ -20,7 +20,8 @@ global:
   pkg_rke2: "packages_rke2"
   software_dir: /app/rke2                           ## RKE2 二进制包目录
   rke2_worker_dir: /etc/rancher/rke2                ## RKE2工作目录 
-  rke2_data_dir: /moone/var/lib/rancher/rke2        ## 保存状态的目录 /var/lib/rancher/rke2
+  rke2_data_dir: /var/lib/rancher/rke2              ## RKE2数据目录: IO 极敏感的场景下把 /var/lib/rancher/rke2/server/db（etcd）单独挂一块 NVMe，/var/lib/rancher/rke2/agent/containerd（镜像）挂大容量盘。
+  kubelet_dir: /var/lib/kubelet                     ## 用于管理 kubelet 文件的根目录（Pod 卷、emptyDir、插件 socket等）  
   profile: ""                                       ## 基准测试验证系统配置: cis 根据实际情况配置
 
 ##============================================================================= 
@@ -48,19 +49,20 @@ rke2_server:
   cluster_domain: "cluster.local"         ## Kubernetes 集群的 DNS 域后缀配置项
 
   tls_san:
-    - 192.168.1.200  ## HA_VIP, 必须在第一行
-    - 192.168.1.81
-    - 192.168.1.61   ## RKE2 SERVER1
-    - 192.168.1.62   ## RKE2 SERVER2
-    - 192.168.1.63   ## RKE2 SERVER3
+    - 192.168.1.200      ## HA_VIP, 必须在第一行
+    - "rke2.kubecy.com"  ## 配置域名
+    - 192.168.1.61       ## RKE2 SERVER1
+    - 192.168.1.62       ## RKE2 SERVER2
+    - 192.168.1.63       ## RKE2 SERVER3
 
-  node_taint:        ## MASTER 注册带有污点 
+  node_taint:            ## MASTER 注册带有污点 
     - "node-role.kubernetes.io/control-plane=true:NoSchedule"
 
   disable_cloud_controller: true  ## 禁用 rke2 默认云控制器管理器
 
   disable:                        ## 禁止部署已打包的组件, 有效项: rke2-coredns, rke2-ingress-nginx, rke2-metrics-server
     - rke2-ingress-nginx
+    - rke2-metrics-server 
 
   write_kubeconfig: /etc/rancher/rke2/rke2.yaml
   write_kubeconfig_mode: "0644"
@@ -106,7 +108,8 @@ rke2_server:
 ##============================================================================= 
 rke2_agent:
   kubelet_arg:
-    - max-pods=150
+    - root-dir="{{ global.kubelet_dir }}"            
+    - max-pods=120
 
   kube_proxy_arg:
     - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
