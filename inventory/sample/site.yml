@@ -4,6 +4,7 @@
 ssh_user: admin                ## SSH 远程用户, 一般禁用root, 通过sudo或者su方式
 rke2_version: v1.34.6+rke2r3   ## 指定RKE2 Kubernetes安装包、离线资源部署版本
 arch: amd64                    ## 服务器CPU硬件架构 amd64=x86_64、arm64=aarch64 用于区分对应架构二进制、镜像包
+download_proxy: "https://gh-proxy.com/ https://ghfast.top/ https://ghproxy.net/"  ##  GitHub 加速: 空格分隔多个, 依次尝试直至成功, 留空则直连
 global:
   install_source: "online"
   ansible_dir: "{{ playbook_dir }}/.."

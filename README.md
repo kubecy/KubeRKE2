@@ -29,6 +29,8 @@
 ./rke2ctl download zxjt-k99     # 按 zxjt-k99 的 rke2_version/arch/cni 配置下载
 ```
 
+GitHub 下载加速镜像在对应环境 `inventory/<环境名>/site.yml` 的 `download_proxy` 项配置（空格分隔多个，依次尝试直至成功，留空则直连）。
+
 或手动下载以下文件：
 
 1. `rke2-images.linux-amd64.tar.zst`：包含 K8s 核心组件+ 默认网络插件 Canal、Calico 等容器镜像。

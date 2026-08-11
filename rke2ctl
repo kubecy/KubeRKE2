@@ -381,6 +381,9 @@ cmd_download() {
   version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
   arch_cfg="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
               | head -1 | tr 'A-Z' 'a-z')"
+  # GitHub 加速镜像: 读环境 site.yml 的 download_proxy (空格分隔多个, 依次尝试), 留空则直连
+  download_proxy="$(sed -n 's/^download_proxy:[[:space:]]*["'\'']\{0,1\}\([^"'\'']*\).*/\1/p' "${site_file}" \
+                    | head -1 | sed 's/[[:space:]]*##.*//')"
   cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
          | head -1 | tr 'A-Z' 'a-z')"
   logger info "环境 ${env_name} 配置: rke2_version=${version:-空} arch=${arch_cfg:-空} cni=${cni:-none}"
@@ -420,26 +423,50 @@ cmd_download() {
   esac
 
   # 下载阶段 (已存在且非空则跳过, 完整性由校验阶段兜底)
-  local file url
+  # GitHub 加速镜像: 空格分隔为列表, 依次尝试直至成功
+  local -a gh_mirrors=()
+  read -r -a gh_mirrors <<< "${download_proxy}"
+  local file url gh_path ok
+  local -a urls
   for file in "${files[@]}"; do
+    gh_path=""   # 非空表示该文件来自 GitHub, 需走加速镜像
     case "${file}" in
       install.sh)
         url="https://get.rke2.io" ;;
       rancher-load-images.sh)
-        url="https://github.com/rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
+        gh_path="rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
       *)
-        url="https://github.com/rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
+        gh_path="rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
     esac
 
     if [ -s "${dest_dir}/${file}" ]; then
       logger info "已存在, 跳过下载: ${file}"
       continue
     fi
-    logger info "正在下载: ${file}"
-    if ! curl -fL --retry 3 --retry-delay 2 --retry-all-errors \
-         -o "${dest_dir}/${file}" "${url}"; then
+
+    # 候选下载地址: GitHub 文件先依次走加速镜像, 最后兜底官方直连
+    urls=()
+    if [ -n "${gh_path}" ]; then
+      for mirror in "${gh_mirrors[@]}"; do
+        urls+=("${mirror}https://github.com/${gh_path}")
+      done
+      urls+=("https://github.com/${gh_path}")
+    else
+      urls+=("${url}")
+    fi
+
+    ok=0
+    for u in "${urls[@]}"; do
+      logger info "正在下载: ${file} <- ${u}"
+      if curl -fL --connect-timeout 10 --retry 2 --retry-delay 2 --retry-all-errors \
+           -o "${dest_dir}/${file}" "${u}"; then
+        ok=1
+        break
+      fi
       rm -f "${dest_dir}/${file}"   # 删除残file, 保证下次重下完整
-      logger error "下载失败: ${file} (${url})"
+    done
+    if [ "${ok}" -ne 1 ]; then
+      logger error "下载失败: ${file} (全部加速镜像及官方直连均失败)"
       exit 1
     fi
   done
