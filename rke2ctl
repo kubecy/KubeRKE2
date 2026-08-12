@@ -416,10 +416,13 @@ cmd_download() {
     "rke2-images.${arch_linux}.tar.gz"
   )
   # 按 cni 值追加对应的 CNI 镜像包 (.tar.gz + .txt)
+#    *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz" "rke2-images-cilium.${arch_linux}.txt") ;;
+#    *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz"  "rke2-images-canal.${arch_linux}.txt")  ;;
+#    *calico*) files+=("rke2-images-calico.${arch_linux}.tar.gz" "rke2-images-calico.${arch_linux}.txt") ;;
   case "${cni}" in
-    *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz" "rke2-images-cilium.${arch_linux}.txt") ;;
-    *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz"  "rke2-images-canal.${arch_linux}.txt")  ;;
-    *calico*) files+=("rke2-images-calico.${arch_linux}.tar.gz" "rke2-images-calico.${arch_linux}.txt") ;;
+    *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz") ;;
+    *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz")  ;;
+    *calico*) files+=("rke2-images-calico.${arch_linux}.tar.gz") ;;
   esac
 
   # 下载阶段 (已存在且非空则跳过, 完整性由校验阶段兜底)
@@ -518,4 +521,3 @@ main() {
   esac
 }
 main "$@"
-exec bash

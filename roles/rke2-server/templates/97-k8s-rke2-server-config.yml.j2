@@ -39,6 +39,7 @@ etcd-snapshot-retention: {{ rke2_server.db.etcd_snapshot_retention }}
 etcd-snapshot-compress: {{ rke2_server.db.etcd_snapshot_compress }}
 
 cni: "{{ rke2_server.cni }}"
+ingress-controller: "{{ rke2_server.ingress_controller }}"
 cluster-cidr: "{{ rke2_server.cluster_cidr }}"
 service-cidr: "{{ rke2_server.service_cidr }}"
 cluster-dns: "{{ rke2_server.cluster_dns }}"

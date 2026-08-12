@@ -1,8 +1,19 @@
 ####################################################################################
 ## 操作系统通用的基础配置                                                        ###
 ####################################################################################
-
 ---
+- name: 检测主机 CGroup 版本 (cgroup v2 = cgroup2fs, v1 = tmpfs)
+  shell: "stat -fc %T /sys/fs/cgroup/"
+  register: host_cgroup_type
+  when: (rke2_version.split('+')[0].split('.')[1] | int) >= 35
+
+- name: 校验 RKE2 >= v1.35 要求 CGroup 必须为 cgroup2fs
+  fail:
+    msg: "主机 {{ inventory_hostname }} 当前 CGroup 版本为 {{ host_cgroup_type.stdout }} (cgroup v1)，RKE2 {{ rke2_version }} (>= v1.35) 要求 cgroup v2 (cgroup2fs)，请升级内核并启用 cgroup v2 后重新部署"
+  when:
+    - (rke2_version.split('+')[0].split('.')[1] | int) >= 35
+    - host_cgroup_type.stdout != "cgroup2fs"
+
 - name: 禁用系统 swap
   shell: "source /etc/profile; swapoff -a && sysctl -w vm.swappiness=0"
   ignore_errors: true
@@ -124,14 +135,27 @@
   stat:
     path: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/rke2.linux-{{ rke2_arch_suffix }}.tar.gz"
   register: rke2_arch_pkg
+  delegate_to: localhost
+  run_once: true
 
 - name: 提示缺少对应架构的离线包
   fail:
     msg: "缺少 {{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/ 下 {{ arch }} 架构的 rke2.linux-{{ rke2_arch_suffix }}.tar.gz, 请先执行 ./rke2ctl download {{ env_dir | basename }}"
   when: not rke2_arch_pkg.stat.exists
 
-- name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
+#- name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
+#  copy:
+#    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/"
+#    dest: "{{ global.software_dir }}"
+#    mode: preserve
+
+- name: 同步 RKE2 安装脚本, 二进制包, 镜像清单文件, 校验文件
   copy:
-    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/"
-    dest: "{{ global.software_dir }}"
+    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/{{ item }}"
+    dest: "{{ global.software_dir }}/"
     mode: preserve
+  with_items:
+    - install.sh
+    - rke2-images-all.linux-amd64.txt
+    - rke2.linux-amd64.tar.gz
+    - sha256sum-amd64.txt
