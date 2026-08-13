@@ -43,6 +43,7 @@ usage() {
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
   ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
+  ./rke2ctl pull <环境名> [registry]                        离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
 
 示例:
   ./rke2ctl new cq-moone-k45                                      创建部署环境
@@ -294,7 +295,7 @@ _rke2ctl() {
 
   # 第 1 个参数: 顶层命令
   if [ "${COMP_CWORD}" -eq 1 ]; then
-    COMPREPLY=( $(compgen -W "new setup download help bash-completion" -- "${cur}") )
+    COMPREPLY=( $(compgen -W "new setup download pull help bash-completion" -- "${cur}") )
     return 0
   fi
 
@@ -305,6 +306,19 @@ _rke2ctl() {
     download)
       if [ "${COMP_CWORD}" -eq 2 ]; then
         # 第 2 参数: 环境名
+        envs=""
+        for d in "__RKE2_REPO_ROOT__"/inventory/*/; do
+          [ -d "${d}" ] || continue
+          name="$(basename "${d}")"
+          [ "${name}" = "sample" ] && continue
+          envs="${envs} ${name}"
+        done
+        COMPREPLY=( $(compgen -W "${envs}" -- "${cur}") )
+      fi
+      ;;
+    pull)
+      if [ "${COMP_CWORD}" -eq 2 ]; then
+        # 环境名: inventory 下所有目录, 排除 sample 模板
         envs=""
         for d in "__RKE2_REPO_ROOT__"/inventory/*/; do
           [ -d "${d}" ] || continue
@@ -355,6 +369,7 @@ FUNC
   printf '\n# rke2ctl tab 补全 (bash-completion)\nsource ~/.rke2ctl.bash\n' >> "${bashrc}" \
     || { logger error "写入 ${bashrc} 失败"; exit 1; }
   logger info "已写入 ${bashrc}"
+  logger info "执行命令加载: source ${bashrc}"
   echo " "
 }
 
@@ -514,6 +529,121 @@ cmd_download() {
   fi
 }
 
+cmd_pull() {
+  # 参数: 环境名 [registry]; registry 缺省读环境 site.yml 的 global.docker_repo.host
+  if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    logger error "pull 需要 1-2 个参数: 环境名 [registry]"
+    usage >&2; exit 2
+  fi
+  local env_name="$1" registry_override="${2:-}"
+
+  if ! valid_env_name "${env_name}"; then
+    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
+    exit 2
+  fi
+  local site_file="${INVENTORY_DIR}/${env_name}/site.yml"
+  [ -f "${site_file}" ] || {
+    logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name}"
+    exit 2
+  }
+
+  # 解析 rke2_version / arch (模式与 cmd_download 一致)
+  local version arch_cfg arch_linux arch_short
+  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
+  arch_cfg="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
+              | head -1 | tr 'A-Z' 'a-z')"
+  case "${arch_cfg}" in
+    amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
+    arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
+    *) logger error "site.yml 中 arch 配置非法: ${arch_cfg:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+  esac
+
+  # 解析 global.docker_repo 块内的 host/user/password (仅块内取值, 避免误取 db/k8s_user 块)
+  local repo_host="" repo_user="" repo_pass="" line in_repo=0
+  local re_key="^[[:space:]]{2}[A-Za-z_][A-Za-z0-9_]*:"
+  local re_host="^[[:space:]]{4}host:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  local re_user="^[[:space:]]{4}user:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  local re_pass="^[[:space:]]{4}password:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ${re_key} ]]; then in_repo=0; fi
+    if [[ "${line}" =~ ^[[:space:]]{2}docker_repo:[[:space:]]*$ ]]; then in_repo=1; continue; fi
+    if [ "${in_repo}" -eq 1 ]; then
+      [[ "${line}" =~ ${re_host} ]] && repo_host="${BASH_REMATCH[1]}"
+      [[ "${line}" =~ ${re_user} ]] && repo_user="${BASH_REMATCH[1]}"
+      [[ "${line}" =~ ${re_pass} ]] && repo_pass="${BASH_REMATCH[1]}"
+    fi
+  done < "${site_file}"
+
+  local registry="${registry_override:-${repo_host}}"
+  if [ -z "${registry}" ]; then
+    logger error "site.yml 未配置 global.docker_repo.host, 请手动指定: ./rke2ctl pull ${env_name} <registry>"
+    exit 2
+  fi
+  [ -n "${repo_user}" ] || {
+    logger error "site.yml 未配置 global.docker_repo.user, 无法 docker login"
+    exit 2
+  }
+
+  # 定位离线包目录
+  local dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}/${arch_short}"
+  [ -d "${dest_dir}" ] || {
+    logger error "找不到离线包目录: ${dest_dir}"
+    logger error "请先下载: ./rke2ctl download ${env_name}"
+    exit 1
+  }
+
+  local list_file="${dest_dir}/rke2-images-all.${arch_linux}.txt"
+  local loader="${dest_dir}/rancher-load-images.sh"
+  [ -f "${list_file}" ] || { logger error "缺少镜像清单: ${list_file}"; exit 1; }
+  [ -f "${loader}" ] || { logger error "缺少 ${loader}, 请重跑 ./rke2ctl download ${env_name}"; exit 1; }
+
+  # 镜像包: 仅 rke2-images*.tar.gz (排除 rke2.linux-*.tar.gz 二进制安装包)
+  local -a tarballs=()
+  local t
+  while IFS= read -r t; do tarballs+=("${t}"); done < <(ls "${dest_dir}"/rke2-images*.tar.gz 2>/dev/null)
+  [ "${#tarballs[@]}" -gt 0 ] || { logger error "未找到镜像包 rke2-images*.tar.gz: ${dest_dir}"; exit 1; }
+
+  # 提权前缀: root 或可直接操作 docker 时不加 sudo
+  local sudo_cmd=""
+  if [ "$(id -u)" -ne 0 ] && ! docker info >/dev/null 2>&1; then
+    command -v sudo >/dev/null 2>&1 || { logger error "当前用户无 docker 权限且未安装 sudo"; exit 1; }
+    sudo_cmd="sudo"
+  fi
+
+  # 1. 去 registry 前缀 (docker.io/), 幂等
+  sed -i 's#docker.io/##g' "${list_file}"
+  logger info "已去除镜像清单 registry 前缀 (docker.io/): ${list_file}"
+
+  # 2. docker login (密码经 stdin 不进进程列表; 与加载脚本同提权前缀, sudo 语境下凭据一致)
+  logger info "登录私有仓库: ${registry} (用户 ${repo_user})"
+  if ! printf '%s\n' "${repo_pass}" | ${sudo_cmd} docker login "${registry}" \
+       -u "${repo_user}" --password-stdin >/dev/null 2>&1; then
+    logger error "docker login 失败: ${registry}, 请检查 site.yml 的 global.docker_repo.user/password"
+    exit 1
+  fi
+  logger info "登录成功: ${registry}"
+
+  # 3. 逐个加载镜像包 (单个失败记录后继续)
+  local rc=0
+  for t in "${tarballs[@]}"; do
+    logger info "加载镜像包: $(basename "${t}") -> ${registry}"
+    if ( cd "${dest_dir}" && ${sudo_cmd} bash rancher-load-images.sh \
+         -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${t}")" -r "${registry}" ); then
+      logger info "加载完成: $(basename "${t}")"
+    else
+      logger error "加载失败: $(basename "${t}")"
+      rc=1
+    fi
+  done
+
+  if [ "${rc}" -eq 0 ]; then
+    logger info "全部镜像包加载完成: ${registry}"
+  else
+    logger error "存在加载失败的镜像包 (退出码 ${rc})"
+  fi
+  exit "${rc}"
+}
+
 main() {
   local cmd="${1:-}"
   [[ -n "${cmd}" ]] || { logger warn "缺少命令, 可参考以下步骤:"; usage; exit 0; }
@@ -521,10 +651,10 @@ main() {
     new)          shift; cmd_new "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     d|download)   shift; cmd_download "$@" ;;
+    p|pull)       shift; cmd_pull "$@" ;;
     help|-h|--help) usage; exit 0 ;;
     bash-completion) shift; cmd_install_completion "$@" ;;
     *)            usage; exit 0 ;;
   esac
 }
 main "$@"
-
