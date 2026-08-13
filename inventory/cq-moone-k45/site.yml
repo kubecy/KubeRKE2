@@ -112,7 +112,7 @@ rke2_server:
 ##============================================================================= 
 rke2_agent:
   kubelet_arg:
-    - root-dir="{{ global.kubelet_dir }}"            
+    - root-dir={{ global.kubelet_dir }}
     - max-pods=120
 
   kube_proxy_arg:

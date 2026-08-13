@@ -99,20 +99,25 @@ rke2_server:
   kube_apiserver_arg:
     - max-requests-inflight=600
     - event-ttl=12h
-  kube_proxy_arg:                             
-    - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
-    - ipvs-strict-arp=true                       ## 用 MetalLB 时, 需要配置
   etcd_arg:
     - auto-compaction-retention=8h
     - quota-backend-bytes=8589934592
     - heartbeat-interval=200
+
+  kubelet_arg:
+    - root-dir={{ global.kubelet_dir }}
+    - max-pods=120
+
+  kube_proxy_arg:                             
+    - proxy-mode=nftables                        ## 代理模式参数:  'iptables'（默认）, 'ipvs' 或 'nftables'
+    - ipvs-strict-arp=true                       ## 用 MetalLB 时, 需要配置
 
 ##============================================================================= 
 ##                                K8S WORKER                                 ##
 ##============================================================================= 
 rke2_agent:
   kubelet_arg:
-    - root-dir="{{ global.kubelet_dir }}"            
+    - root-dir={{ global.kubelet_dir }}
     - max-pods=120
 
   kube_proxy_arg:
