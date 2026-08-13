@@ -54,6 +54,28 @@ INVENTORY_DIR="${REPO_ROOT}/inventory"
 # 校验环境名合法性: 仅允许字母/数字/下划线/连字符
 valid_env_name() { [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
 
+# 检查外部命令是否可用, 缺失时输出错误并退出
+# 用法: require_cmd <命令名> <安装提示>
+# 退出码: 1 (命令缺失)
+require_cmd() {
+  local cmd_name="$1" install_hint="$2"
+  command -v "${cmd_name}" >/dev/null 2>&1 || {
+    logger error "未找到 ${cmd_name}, ${install_hint}"
+    exit 1
+  }
+}
+
+# 校验环境名合法性, 非法时输出错误并退出
+# 用法: require_valid_env <环境名>
+# 退出码: 2 (非法环境名)
+require_valid_env() {
+  local env_name="$1"
+  if ! valid_env_name "${env_name}"; then
+    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
+    exit 2
+  fi
+}
+
 # ------------------------------------------------------------------
 # 帮助与子命令
 # ------------------------------------------------------------------
@@ -91,10 +113,7 @@ cmd_new() {
   }
   local env_name="$1"
 
-  if ! valid_env_name "${env_name}"; then
-    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
-    exit 2
-  fi
+  require_valid_env "${env_name}"
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
   if [[ -e "${env_dir}" ]]; then
@@ -105,10 +124,7 @@ cmd_new() {
     logger error "找不到模板目录 inventory/sample"
     exit 1
   fi
-  command -v ansible-vault >/dev/null 2>&1 || {
-    logger error "未找到 ansible-vault, 请先安装 ansible"
-    exit 1
-  }
+  require_cmd ansible-vault "请先安装 ansible"
 
   cp -r "${INVENTORY_DIR}/sample" "${env_dir}" || { logger error "复制模板失败"; exit 1; }
   logger info "已创建环境 ${env_name}: ${env_dir}"
@@ -155,10 +171,7 @@ cmd_setup() {
       ;;
   esac
 
-  if ! valid_env_name "${env_name}"; then
-    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
-    exit 2
-  fi
+  require_valid_env "${env_name}"
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
   if [[ ! -d "${env_dir}" ]]; then
@@ -180,10 +193,7 @@ cmd_setup() {
     exit 1
   }
 
-  command -v ansible-playbook >/dev/null 2>&1 || {
-    logger error "未找到 ansible-playbook, 请先安装 ansible"
-    exit 1
-  }
+  require_cmd ansible-playbook "请先安装 ansible"
 
   logger info "开始部署: ${env_name} (${node_type})"
   logger info "执行: ansible-playbook -i inventory/${env_name}/hosts"\
@@ -209,10 +219,7 @@ cmd_ssh_copy() {
   local hosts_file="${env_dir}/hosts"
   local site_file="${env_dir}/site.yml"
 
-  command -v sshpass >/dev/null 2>&1 || {
-    logger error "未找到 sshpass, 请先安装 (如: yum install -y sshpass)"
-    exit 1
-  }
+  require_cmd sshpass "请先安装 (如: yum install -y sshpass)"
 
   local ssh_user
   ssh_user="$(sed -n 's/^ssh_user:[[:space:]]*\([^ #]*\).*/\1/p' "${site_file}" | head -n 1)"
@@ -276,10 +283,7 @@ cmd_ssh_copy() {
       "(参考 inventory/sample/secrets.yml)"
     exit 1
   fi
-  command -v ansible-vault >/dev/null 2>&1 || {
-    logger error "未找到 ansible-vault, 请先安装 ansible"
-    exit 1
-  }
+  require_cmd ansible-vault "请先安装 ansible"
   logger info "正在解密 ${secrets_file} (请输入 vault 密码)"
   local vault_text
   vault_text="$(ansible-vault view "${secrets_file}" 2>/dev/null)" || {
@@ -460,10 +464,7 @@ cmd_download() {
   local version arch_raw cni
   local arch_linux arch_short version_urlsafe dest_dir site_file download_proxy
 
-  if ! valid_env_name "${env_name}"; then
-    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
-    exit 2
-  fi
+  require_valid_env "${env_name}"
   site_file="${INVENTORY_DIR}/${env_name}/site.yml"
   [[ -f "${site_file}" ]] || {
     logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name} 或指定已有环境名"
@@ -625,10 +626,7 @@ cmd_pull() {
   fi
   local env_name="$1" registry_override="${2:-}"
 
-  if ! valid_env_name "${env_name}"; then
-    logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
-    exit 2
-  fi
+  require_valid_env "${env_name}"
   local site_file="${INVENTORY_DIR}/${env_name}/site.yml"
   [[ -f "${site_file}" ]] || {
     logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name}"
