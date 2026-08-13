@@ -658,7 +658,7 @@ cmd_pull() {
   fi
 
   sed -i 's#docker.io/##g' "${image_list_file}"
-  logger info "已去除镜像清单 registry 前缀 (docker.io/): ${image_list_file}"
+  logger info "去除镜像清单 registry 前缀 (docker.io/): ${image_list_file}"
 
   logger info "登录私有仓库: ${registry} (用户 ${repo_user})"
   if ! printf '%s\n' "${repo_pass}" | ${sudo_cmd} docker login "${registry}" \
