@@ -4,33 +4,33 @@
 ## ============================================================
 
 logger() {
-  TIMESTAMP=$(date +'%Y-%m-%d %H:%M:%S')
-  local FID=$(basename "${BASH_SOURCE[1]}")
-  local SOURCE="\033[35m[$FID:${BASH_LINENO[0]}]\033[0m"
+  local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
+  local caller_file=$(basename "${BASH_SOURCE[1]}")
+  local caller_prefix="\033[35m[${caller_file}:${BASH_LINENO[0]}]\033[0m"
   case "$1" in
     debug)
-      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[36mDEBUG \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[36mDEBUG \033[0m$2"
       ;;
     info)
-      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[32mINFO  \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[32mINFO  \033[0m$2"
       ;;
     warn)
-      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[33mWARN  \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[33mWARN  \033[0m$2"
       ;;
     error)
-      echo -e "\033[35m$TIMESTAMP\033[0m $SOURCE \033[31mERROR \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[31mERROR \033[0m$2"
       ;;
     *) ;;
   esac
 }
 
-SOURCE="${BASH_SOURCE[0]}"
-while [ -h "${SOURCE}" ]; do
-  SCRIPT_DIR="$(cd -P "$(dirname "${SOURCE}")" && pwd)"
-  SOURCE="$(readlink "${SOURCE}")"
-  [[ "${SOURCE}" != /* ]] && SOURCE="${SCRIPT_DIR}/${SOURCE}"
+script_path="${BASH_SOURCE[0]}"
+while [ -h "${script_path}" ]; do
+  script_dir="$(cd -P "$(dirname "${script_path}")" && pwd)"
+  script_path="$(readlink "${script_path}")"
+  [[ "${script_path}" != /* ]] && script_path="${script_dir}/${script_path}"
 done
-REPO_ROOT="$(cd -P "$(dirname "${SOURCE}")" && pwd)"
+REPO_ROOT="$(cd -P "$(dirname "${script_path}")" && pwd)"
 cd "${REPO_ROOT}" || { logger error "无法进入仓库目录 ${REPO_ROOT}"; exit 1; }
 INVENTORY_DIR="${REPO_ROOT}/inventory"
 
@@ -169,16 +169,16 @@ cmd_ssh_copy() {
   local master_ips=() worker_ips=() master_hosts=() worker_hosts=() group host ip
   while read -r group host ip; do
     case "${group}" in
-      M) master_ips+=("${ip}"); master_hosts+=("${host}") ;;
-      W) worker_ips+=("${ip}"); worker_hosts+=("${host}") ;;
+      master) master_ips+=("${ip}"); master_hosts+=("${host}") ;;
+      worker) worker_ips+=("${ip}"); worker_hosts+=("${host}") ;;
     esac
   done < <(awk '
     /^[[:space:]]*#/ { next }
     /^[[:space:]]*$/ { next }
-    /^[[:space:]]*\[/ { s = ($0 ~ /rke2_server/) ? "M" : (($0 ~ /rke2_agent/) ? "W" : ""); next }
-    s != "" && match($0, /ansible_host=[0-9.]+/) {
-      ip = substr($0, RSTART + 13, RLENGTH - 13)
-      if (!seen[s, ip]++) { print s, $1, ip }
+    /^[[:space:]]*\[/ { role = ($0 ~ /rke2_server/) ? "master" : (($0 ~ /rke2_agent/) ? "worker" : ""); next }
+    role != "" && match($0, /ansible_host=[0-9.]+/) {
+      ansible_ip = substr($0, RSTART + 13, RLENGTH - 13)
+      if (!seen[role, ansible_ip]++) { print role, $1, ansible_ip }
     }
   ' "${hosts_file}")
 
@@ -239,7 +239,7 @@ cmd_ssh_copy() {
     fi
   done <<< "${vault_text}"
 
-  local rc=0 ip ip_pad
+  local failed=0 ip padded_ip
   local -a group_ips group_hosts
   for group in master worker; do
     if [ "${group}" = "master" ]; then
@@ -252,15 +252,15 @@ cmd_ssh_copy() {
     for i in "${!group_ips[@]}"; do
       ip="${group_ips[i]}"
       local host="${group_hosts[i]}"
-      local b64="${host_pass_b64[${host}]}"
-      if [ -z "${b64}" ]; then
+      local password_b64="${host_pass_b64[${host}]}"
+      if [ -z "${password_b64}" ]; then
         logger error "secrets.yml 中缺少主机 ${host} 的 sudopass"
-        rc=1
+        failed=1
         continue
       fi
       local password
-      password="$(printf '%s' "${b64}" | base64 -d)"
-      printf -v ip_pad '%-15s' "${ip}"
+      password="$(printf '%s' "${password_b64}" | base64 -d)"
+      printf -v padded_ip '%-15s' "${ip}"
       sshpass -p "${password}" ssh-copy-id \
           -o StrictHostKeyChecking=accept-new \
           -o ConnectTimeout=10 \
@@ -269,16 +269,16 @@ cmd_ssh_copy() {
           -o PasswordAuthentication=yes \
           "${ssh_user}@${ip}" >/dev/null 2>&1
       if [ $? -eq 0 ]; then
-        logger info "分发到 ${group}：${host} ${ip_pad} 分发成功"
+        logger info "分发到 ${group}：${host} ${padded_ip} 分发成功"
       else
-        logger error "分发到 ${group}：${host} ${ip_pad} 分发失败"
-        rc=1
+        logger error "分发到 ${group}：${host} ${padded_ip} 分发失败"
+        failed=1
       fi
     done
   done
   unset password
-  [ "${rc}" -eq 0 ] && logger info "全部主机分发完成" || logger error "存在分发失败的主机 (退出码 ${rc})"
-  exit "${rc}"
+  [ "${failed}" -eq 0 ] && logger info "全部主机分发完成" || logger error "存在分发失败的主机 (退出码 ${failed})"
+  exit "${failed}"
 }
 
 cmd_install_completion() {
@@ -380,8 +380,8 @@ cmd_download() {
     usage >&2; exit 2
   }
   local env_name="$1"
-  local version arch_cfg cni
-  local arch_linux arch_short version_urlsafe dest_dir site_file
+  local version arch_raw cni
+  local arch_linux arch_short version_urlsafe dest_dir site_file download_proxy
 
   if ! valid_env_name "${env_name}"; then
     logger error "非法环境名: ${env_name} (仅允许字母/数字/下划线/连字符)"
@@ -395,14 +395,14 @@ cmd_download() {
 
   # 解析顶层 rke2_version / arch 与 rke2_server.cni (兼容带引号与注释)
   version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
-  arch_cfg="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
+  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
               | head -1 | tr 'A-Z' 'a-z')"
   # GitHub 加速镜像: 读环境 site.yml 的 download_proxy (空格分隔多个, 依次尝试), 留空则直连
   download_proxy="$(sed -n 's/^download_proxy:[[:space:]]*["'\'']\{0,1\}\([^"'\'']*\).*/\1/p' "${site_file}" \
                     | head -1 | sed 's/[[:space:]]*##.*//')"
   cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
          | head -1 | tr 'A-Z' 'a-z')"
-  logger info "环境 ${env_name} 配置: rke2_version=${version:-空} arch=${arch_cfg:-空} cni=${cni:-none}"
+  logger info "环境 ${env_name} 配置: rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
 
   # 版本格式校验 (如 v1.34.6+rke2r3, 兼容 hotfix 后缀)
   if ! [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\+rke2r[0-9]+(\.[0-9a-zA-Z]+)*$ ]]; then
@@ -412,10 +412,10 @@ cmd_download() {
   version_urlsafe="${version//+/%2B}"   # GitHub URL 中 + 必须编码为 %2B
 
   # 架构映射 (amd/arm 简写 -> amd64/arm64)
-  case "${arch_cfg}" in
+  case "${arch_raw}" in
     amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
     arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *) logger error "site.yml 中 arch 配置非法: ${arch_cfg:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+    *) logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
   esac
 
   # 目标目录 packages_rke2/<环境名>/<版本>/<架构>/ (架构目录用规范形式: amd64/arm64)
@@ -443,19 +443,19 @@ cmd_download() {
 
   # 下载阶段 (已存在且非空则跳过, 完整性由校验阶段兜底)
   # GitHub 加速镜像: 空格分隔为列表, 依次尝试直至成功
-  local -a gh_mirrors=()
-  read -r -a gh_mirrors <<< "${download_proxy}"
-  local file url gh_path ok
+  local -a github_mirrors=()
+  read -r -a github_mirrors <<< "${download_proxy}"
+  local file url github_path fetch_ok
   local -a urls
   for file in "${files[@]}"; do
-    gh_path=""   # 非空表示该文件来自 GitHub, 需走加速镜像
+    github_path=""   # 非空表示该文件来自 GitHub, 需走加速镜像
     case "${file}" in
       install.sh)
         url="https://get.rke2.io" ;;
       rancher-load-images.sh)
-        gh_path="rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
+        github_path="rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
       *)
-        gh_path="rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
+        github_path="rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
     esac
 
     if [ -s "${dest_dir}/${file}" ]; then
@@ -465,41 +465,41 @@ cmd_download() {
 
     # 候选下载地址: GitHub 文件先依次走加速镜像, 最后兜底官方直连
     urls=()
-    if [ -n "${gh_path}" ]; then
-      for mirror in "${gh_mirrors[@]}"; do
-        urls+=("${mirror}https://github.com/${gh_path}")
+    if [ -n "${github_path}" ]; then
+      for mirror in "${github_mirrors[@]}"; do
+        urls+=("${mirror}https://github.com/${github_path}")
       done
-      urls+=("https://github.com/${gh_path}")
+      urls+=("https://github.com/${github_path}")
     else
       urls+=("${url}")
     fi
 
-    ok=0
-    for u in "${urls[@]}"; do
-      logger info "正在下载: ${file} <- ${u}"
+    fetch_ok=0
+    for mirror_url in "${urls[@]}"; do
+      logger info "正在下载: ${file} <- ${mirror_url}"
       if curl -fL --connect-timeout 10 --retry 2 --retry-delay 2 --retry-all-errors \
-           -o "${dest_dir}/${file}" "${u}"; then
-        ok=1
+           -o "${dest_dir}/${file}" "${mirror_url}"; then
+        fetch_ok=1
         break
       fi
       rm -f "${dest_dir}/${file}"   # 删除残file, 保证下次重下完整
     done
-    if [ "${ok}" -ne 1 ]; then
+    if [ "${fetch_ok}" -ne 1 ]; then
       logger error "下载失败: ${file} (全部加速镜像及官方直连均失败)"
       exit 1
     fi
   done
 
   # 校验阶段 (sha256sum 文件条目格式: "hash  文件名" 双空格)
-  local checksums="${dest_dir}/sha256sum-${arch_short}.txt"
-  [ -f "${checksums}" ] || { logger error "缺少校验文件 ${checksums}"; exit 1; }
-  local expected actual fail=0
+  local checksum_file="${dest_dir}/sha256sum-${arch_short}.txt"
+  [ -f "${checksum_file}" ] || { logger error "缺少校验文件 ${checksum_file}"; exit 1; }
+  local expected actual failed=0
   for file in "${files[@]}"; do
     # rke2-images-all 清单会被人为修改 (如去除 docker.io/ 前缀), 哈希校验无意义, 忽略
     if [ "${file}" = "rke2-images-all.${arch_linux}.txt" ]; then
       expected=""
     else
-      expected="$(grep -F "  ${file}" "${checksums}" | head -1 | awk '{print $1}')"
+      expected="$(grep -F "  ${file}" "${checksum_file}" | head -1 | awk '{print $1}')"
     fi
     if [ -z "${expected}" ]; then
       # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
@@ -507,7 +507,7 @@ cmd_download() {
         logger info "非空检查通过: ${file}"
       else
         logger error "文件缺失或为空: ${file}"
-        fail=1
+        failed=1
       fi
       continue
     fi
@@ -517,11 +517,11 @@ cmd_download() {
     else
       logger error "校验失败: ${file} (期望 ${expected}, 实际 ${actual})"
       logger error "请删除后重下: rm -f '${dest_dir}/${file}'"
-      fail=1
+      failed=1
     fi
   done
 
-  if [ "${fail}" -eq 0 ]; then
+  if [ "${failed}" -eq 0 ]; then
     logger info "全部下载完成并校验通过: ${dest_dir}"
   else
     logger error "存在失败项, 修复后重跑: ./rke2ctl download ${env_name}"
@@ -548,14 +548,14 @@ cmd_pull() {
   }
 
   # 解析 rke2_version / arch (模式与 cmd_download 一致)
-  local version arch_cfg arch_linux arch_short
+  local version arch_raw arch_linux arch_short
   version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
-  arch_cfg="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
+  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
               | head -1 | tr 'A-Z' 'a-z')"
-  case "${arch_cfg}" in
+  case "${arch_raw}" in
     amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
     arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *) logger error "site.yml 中 arch 配置非法: ${arch_cfg:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+    *) logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
   esac
 
   # 解析 global.docker_repo 块内的 host/user/password (仅块内取值, 避免误取 db/k8s_user 块)
@@ -592,15 +592,15 @@ cmd_pull() {
     exit 1
   }
 
-  local list_file="${dest_dir}/rke2-images-all.${arch_linux}.txt"
+  local image_list_file="${dest_dir}/rke2-images-all.${arch_linux}.txt"
   local loader="${dest_dir}/rancher-load-images.sh"
-  [ -f "${list_file}" ] || { logger error "缺少镜像清单: ${list_file}"; exit 1; }
+  [ -f "${image_list_file}" ] || { logger error "缺少镜像清单: ${image_list_file}"; exit 1; }
   [ -f "${loader}" ] || { logger error "缺少 ${loader}, 请重跑 ./rke2ctl download ${env_name}"; exit 1; }
 
   # 镜像包: 仅 rke2-images*.tar.gz (排除 rke2.linux-*.tar.gz 二进制安装包)
   local -a tarballs=()
-  local t
-  while IFS= read -r t; do tarballs+=("${t}"); done < <(ls "${dest_dir}"/rke2-images*.tar.gz 2>/dev/null)
+  local tarball
+  while IFS= read -r tarball; do tarballs+=("${tarball}"); done < <(ls "${dest_dir}"/rke2-images*.tar.gz 2>/dev/null)
   [ "${#tarballs[@]}" -gt 0 ] || { logger error "未找到镜像包 rke2-images*.tar.gz: ${dest_dir}"; exit 1; }
 
   # 提权前缀: root 或可直接操作 docker 时不加 sudo
@@ -611,8 +611,8 @@ cmd_pull() {
   fi
 
   # 1. 去 registry 前缀 (docker.io/), 幂等
-  sed -i 's#docker.io/##g' "${list_file}"
-  logger info "已去除镜像清单 registry 前缀 (docker.io/): ${list_file}"
+  sed -i 's#docker.io/##g' "${image_list_file}"
+  logger info "已去除镜像清单 registry 前缀 (docker.io/): ${image_list_file}"
 
   # 2. docker login (密码经 stdin 不进进程列表; 与加载脚本同提权前缀, sudo 语境下凭据一致)
   logger info "登录私有仓库: ${registry} (用户 ${repo_user})"
@@ -624,24 +624,24 @@ cmd_pull() {
   logger info "登录成功: ${registry}"
 
   # 3. 逐个加载镜像包 (单个失败记录后继续)
-  local rc=0
-  for t in "${tarballs[@]}"; do
-    logger info "加载镜像包: $(basename "${t}") -> ${registry}"
+  local failed=0
+  for tarball in "${tarballs[@]}"; do
+    logger info "加载镜像包: $(basename "${tarball}") -> ${registry}"
     if ( cd "${dest_dir}" && ${sudo_cmd} bash rancher-load-images.sh \
-         -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${t}")" -r "${registry}" ); then
-      logger info "加载完成: $(basename "${t}")"
+         -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${tarball}")" -r "${registry}" ); then
+      logger info "加载完成: $(basename "${tarball}")"
     else
-      logger error "加载失败: $(basename "${t}")"
-      rc=1
+      logger error "加载失败: $(basename "${tarball}")"
+      failed=1
     fi
   done
 
-  if [ "${rc}" -eq 0 ]; then
+  if [ "${failed}" -eq 0 ]; then
     logger info "全部镜像包加载完成: ${registry}"
   else
-    logger error "存在加载失败的镜像包 (退出码 ${rc})"
+    logger error "存在加载失败的镜像包 (退出码 ${failed})"
   fi
-  exit "${rc}"
+  exit "${failed}"
 }
 
 main() {
