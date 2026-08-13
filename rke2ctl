@@ -76,6 +76,47 @@ require_valid_env() {
   fi
 }
 
+# 从 site.yml 提取单个标量字段 (兼容可选引号与行尾注释)
+# 用法: site_get_field <site.yml路径> <键名正则前缀> <输出变量名>
+#   例: site_get_field "${site_file}" '^rke2_version' version
+#       site_get_field "${site_file}" '^[[:space:]]*cni' cni
+site_get_field() {
+  local site_file="$1" key_prefix="$2" out_var="$3" value
+  value="$(sed -n "s/${key_prefix}:[[:space:]]*[\"']\{0,1\}\([^\"'[:space:]]*\).*/\1/p" \
+      "${site_file}" | head -n 1)"
+  printf -v "${out_var}" '%s' "${value}"
+}
+
+# 从 site.yml 提取 download_proxy (空格分隔多个加速镜像, 去除行尾 ## 注释)
+# 用法: site_get_proxy <site.yml路径> <输出变量名>
+site_get_proxy() {
+  local site_file="$1" out_var="$2" value
+  value="$(sed -n "s/^download_proxy:[[:space:]]*[\"']\{0,1\}\([^\"']*\).*/\1/p" \
+      "${site_file}" | head -n 1 | sed 's/[[:space:]]*##.*//')"
+  printf -v "${out_var}" '%s' "${value}"
+}
+
+# 将 site.yml 的 arch 简写映射为 RKE2 发布命名 (amd64/arm64)
+# 用法: resolve_arch <arch_raw> <linux名输出变量> <短名输出变量>
+# 退出码: 2 (非法 arch 值)
+resolve_arch() {
+  local arch_raw="$1" arch_linux_var="$2" arch_short_var="$3"
+  case "${arch_raw}" in
+    amd|amd64)
+      printf -v "${arch_linux_var}" '%s' 'linux-amd64'
+      printf -v "${arch_short_var}" '%s' 'amd64'
+      ;;
+    arm|arm64)
+      printf -v "${arch_linux_var}" '%s' 'linux-arm64'
+      printf -v "${arch_short_var}" '%s' 'arm64'
+      ;;
+    *)
+      logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"
+      exit 2
+      ;;
+  esac
+}
+
 # ------------------------------------------------------------------
 # 帮助与子命令
 # ------------------------------------------------------------------
@@ -472,16 +513,14 @@ cmd_download() {
   }
 
   # 解析顶层 rke2_version / arch 与 rke2_server.cni (兼容带引号与注释)
-  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
-      "${site_file}" | head -n 1)"
-  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
-      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
+  site_get_field "${site_file}" '^rke2_version' version
+  site_get_field "${site_file}" '^arch' arch_raw
+  arch_raw="$(printf '%s' "${arch_raw}" | tr 'A-Z' 'a-z')"
   # GitHub 加速镜像: 读环境 site.yml 的 download_proxy
   # (空格分隔多个, 依次尝试), 留空则直连
-  download_proxy="$(sed -n 's/^download_proxy:[[:space:]]*["'\'']\{0,1\}\([^"'\'']*\).*/\1/p' \
-      "${site_file}" | head -n 1 | sed 's/[[:space:]]*##.*//')"
-  cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
-      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
+  site_get_proxy "${site_file}" download_proxy
+  site_get_field "${site_file}" '^[[:space:]]*cni' cni
+  cni="$(printf '%s' "${cni}" | tr 'A-Z' 'a-z')"
   logger info "环境 ${env_name} 配置:"\
     "rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
 
@@ -494,14 +533,7 @@ cmd_download() {
   version_urlsafe="${version//+/%2B}"   # GitHub URL 中 + 必须编码为 %2B
 
   # 架构映射 (amd/arm 简写 -> amd64/arm64)
-  case "${arch_raw}" in
-    amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
-    arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *)
-      logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"
-      exit 2
-      ;;
-  esac
+  resolve_arch "${arch_raw}" arch_linux arch_short
 
   # 目标目录 packages_rke2/<环境名>/<版本>/<架构>/
   # (架构目录用规范形式: amd64/arm64)
@@ -635,18 +667,10 @@ cmd_pull() {
 
   # 解析 rke2_version / arch (模式与 cmd_download 一致)
   local version arch_raw arch_linux arch_short
-  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
-      "${site_file}" | head -n 1)"
-  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
-      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
-  case "${arch_raw}" in
-    amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
-    arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *)
-      logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"
-      exit 2
-      ;;
-  esac
+  site_get_field "${site_file}" '^rke2_version' version
+  site_get_field "${site_file}" '^arch' arch_raw
+  arch_raw="$(printf '%s' "${arch_raw}" | tr 'A-Z' 'a-z')"
+  resolve_arch "${arch_raw}" arch_linux arch_short
 
   # 解析 global.docker_repo 块内的 host/user/password
   # (仅块内取值, 避免误取 db/k8s_user 块)
