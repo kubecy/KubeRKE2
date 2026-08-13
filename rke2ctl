@@ -7,25 +7,26 @@ logger() {
   local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
   local caller_file=$(basename "${BASH_SOURCE[1]}")
   local caller_prefix="\033[35m[${caller_file}:${BASH_LINENO[0]}]\033[0m"
+  local message="${*:2}"
   case "$1" in
     debug)
-      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[36mDEBUG \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[36mDEBUG \033[0m${message}"
       ;;
     info)
-      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[32mINFO  \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[32mINFO  \033[0m${message}"
       ;;
     warn)
-      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[33mWARN  \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[33mWARN  \033[0m${message}"
       ;;
     error)
-      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[31mERROR \033[0m$2"
+      echo -e "\033[35m${timestamp}\033[0m ${caller_prefix} \033[31mERROR \033[0m${message}"
       ;;
     *) ;;
   esac
 }
 
 script_path="${BASH_SOURCE[0]}"
-while [ -h "${script_path}" ]; do
+while [[ -h "${script_path}" ]]; do
   script_dir="$(cd -P "$(dirname "${script_path}")" && pwd)"
   script_path="$(readlink "${script_path}")"
   [[ "${script_path}" != /* ]] && script_path="${script_dir}/${script_path}"
@@ -36,7 +37,7 @@ INVENTORY_DIR="${REPO_ROOT}/inventory"
 
 usage() {
   echo -e "\033[33mUsage:\033[0m ./rke2ctl <command> [args]"
-  cat <<EOF
+  cat <<'EOF'
 用法:
   ./rke2ctl help                                             显示本帮助
   ./rke2ctl bash-completion                                  启用 tab 补全
@@ -58,7 +59,11 @@ EOF
 valid_env_name() { [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
 
 cmd_new() {
-  [ "$#" -eq 1 ] || { logger error "new 需要 1 个参数: 环境名"; usage >&2; exit 2; }
+  [[ $# -eq 1 ]] || {
+    logger error "new 需要 1 个参数: 环境名"
+    usage >&2
+    exit 2
+  }
   local env_name="$1"
 
   if ! valid_env_name "${env_name}"; then
@@ -67,11 +72,11 @@ cmd_new() {
   fi
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
-  if [ -e "${env_dir}" ]; then
+  if [[ -e "${env_dir}" ]]; then
     logger error "环境 ${env_name} 已存在: ${env_dir}"
     exit 2
   fi
-  if [ ! -d "${INVENTORY_DIR}/sample" ]; then
+  if [[ ! -d "${INVENTORY_DIR}/sample" ]]; then
     logger error "找不到模板目录 inventory/sample"
     exit 1
   fi
@@ -106,12 +111,20 @@ EOF
 }
 
 cmd_setup() {
-  [ "$#" -eq 2 ] || { logger error "setup 需要 2 个参数: 环境名 与 部署类型"; usage >&2; exit 2; }
+  [[ $# -eq 2 ]] || {
+    logger error "setup 需要 2 个参数: 环境名 与 部署类型"
+    usage >&2
+    exit 2
+  }
   local env_name="$1" node_type="$2"
 
   case "${node_type}" in
     rke2-server|rke2-agent|ssh-copy) ;;
-    *) logger error "无效的部署类型: ${node_type}, 可选值: rke2-server / rke2-agent / ssh-copy"; exit 2 ;;
+    *)
+      logger error "无效的部署类型: ${node_type}, 可选值:"\
+        "rke2-server / rke2-agent / ssh-copy"
+      exit 2
+      ;;
   esac
 
   if ! valid_env_name "${env_name}"; then
@@ -120,18 +133,24 @@ cmd_setup() {
   fi
 
   local env_dir="${INVENTORY_DIR}/${env_name}"
-  if [ ! -d "${env_dir}" ]; then
+  if [[ ! -d "${env_dir}" ]]; then
     logger error "环境 ${env_name} 不存在, 请先执行: ./rke2ctl new ${env_name}"
     exit 2
   fi
-  [ -f "${env_dir}/hosts" ] || { logger error "缺少 ${env_dir}/hosts, 请先修改 hosts"; exit 1; }
+  [[ -f "${env_dir}/hosts" ]] || {
+    logger error "缺少 ${env_dir}/hosts, 请先修改 hosts"
+    exit 1
+  }
 
-  if [ "${node_type}" = "ssh-copy" ]; then
+  if [[ "${node_type}" == "ssh-copy" ]]; then
     cmd_ssh_copy "${env_dir}"
-    exit $?
+    exit
   fi
 
-  [ -f "${env_dir}/secrets.yml" ] || { logger error "缺少 ${env_dir}/secrets.yml, 请先加密并填入 sudo 密码"; exit 1; }
+  [[ -f "${env_dir}/secrets.yml" ]] || {
+    logger error "缺少 ${env_dir}/secrets.yml, 请先加密并填入 sudo 密码"
+    exit 1
+  }
 
   command -v ansible-playbook >/dev/null 2>&1 || {
     logger error "未找到 ansible-playbook, 请先安装 ansible"
@@ -139,15 +158,17 @@ cmd_setup() {
   }
 
   logger info "开始部署: ${env_name} (${node_type})"
-  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts --ask-vault-pass -e env_dir=${env_dir} playbooks/${node_type}.yml"
+  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts"\
+    "--ask-vault-pass -e env_dir=${env_dir} playbooks/${node_type}.yml"
 
   ansible-playbook -i "inventory/${env_name}/hosts" \
-                   --ask-vault-pass -e "env_dir=${env_dir}" "playbooks/${node_type}.yml"
+      --ask-vault-pass -e "env_dir=${env_dir}" "playbooks/${node_type}.yml"
   local rc=$?
-  if [ "${rc}" -eq 0 ]; then
+  if [[ "${rc}" -eq 0 ]]; then
     logger info "部署完成 (退出码 0)"
   else
-    logger error "部署失败 (退出码 ${rc}: 1=执行错误 2=主机不可达 3=解析错误 99=中断)"
+    logger error "部署失败 (退出码 ${rc}: 1=执行错误 2=主机不可达"\
+      "3=解析错误 99=中断)"
   fi
   exit "${rc}"
 }
@@ -163,8 +184,10 @@ cmd_ssh_copy() {
   }
 
   local ssh_user
-  ssh_user="$(sed -n 's/^ssh_user:[[:space:]]*\([^ #]*\).*/\1/p' "${site_file}" | head -1)"
-  [ -z "${ssh_user}" ] && ssh_user="admin"
+  ssh_user="$(sed -n 's/^ssh_user:[[:space:]]*\([^ #]*\).*/\1/p' "${site_file}" | head -n 1)"
+  if [[ -z "${ssh_user}" ]]; then
+    ssh_user="admin"
+  fi
 
   local master_ips=() worker_ips=() master_hosts=() worker_hosts=() group host ip
   while read -r group host ip; do
@@ -175,7 +198,11 @@ cmd_ssh_copy() {
   done < <(awk '
     /^[[:space:]]*#/ { next }
     /^[[:space:]]*$/ { next }
-    /^[[:space:]]*\[/ { role = ($0 ~ /rke2_server/) ? "master" : (($0 ~ /rke2_agent/) ? "worker" : ""); next }
+    /^[[:space:]]*\[/ {
+      role = ($0 ~ /rke2_server/) ? "master" \
+        : (($0 ~ /rke2_agent/) ? "worker" : "")
+      next
+    }
     role != "" && match($0, /ansible_host=[0-9.]+/) {
       ansible_ip = substr($0, RSTART + 13, RLENGTH - 13)
       if (!seen[role, ansible_ip]++) { print role, $1, ansible_ip }
@@ -183,35 +210,39 @@ cmd_ssh_copy() {
   ' "${hosts_file}")
 
   local total=$(( ${#master_ips[@]} + ${#worker_ips[@]} ))
-  if [ "${total}" -eq 0 ]; then
+  if [[ "${total}" -eq 0 ]]; then
     logger error "未在 ${hosts_file} 中解析到任何主机"
     exit 1
   fi
   logger info "SSH 用户: ${ssh_user}"
-  if [ "${#master_ips[@]}" -gt 0 ]; then
+  if [[ ${#master_ips[@]} -gt 0 ]]; then
     logger info "向 ${#master_ips[@]} 台 master 主机分发公钥: "
     for ip in "${master_ips[@]}"; do
       echo "${ip} "
     done
   fi
-  if [ "${#worker_ips[@]}" -gt 0 ]; then
+  if [[ ${#worker_ips[@]} -gt 0 ]]; then
     logger info "向 ${#worker_ips[@]} 台 worker 主机分发公钥: "
     for ip in "${worker_ips[@]}"; do
       echo "${ip} "
     done
   fi
 
-  if [ ! -f ~/.ssh/id_rsa.pub ]; then
+  if [[ ! -f ~/.ssh/id_rsa.pub ]]; then
     logger info "未检测到 SSH 公钥, 自动生成..."
-    ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa || { logger error "SSH 密钥生成失败"; exit 1; }
+    ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa || {
+      logger error "SSH 密钥生成失败"
+      exit 1
+    }
   fi
   chmod 600 ~/.ssh/id_rsa 2>/dev/null
   chmod 644 ~/.ssh/id_rsa.pub 2>/dev/null
 
   # 从 secrets.yml 读取各主机 admin 密码 (servers.<主机名>.sudopass, base64 编码)
   local secrets_file="${env_dir}/secrets.yml"
-  if [ ! -f "${secrets_file}" ]; then
-    logger error "缺少 ${secrets_file}, 请先创建并加密 (参考 inventory/sample/secrets.yml)"
+  if [[ ! -f "${secrets_file}" ]]; then
+    logger error "缺少 ${secrets_file}, 请先创建并加密"\
+      "(参考 inventory/sample/secrets.yml)"
     exit 1
   fi
   command -v ansible-vault >/dev/null 2>&1 || {
@@ -242,7 +273,7 @@ cmd_ssh_copy() {
   local failed=0 ip padded_ip
   local -a group_ips group_hosts
   for group in master worker; do
-    if [ "${group}" = "master" ]; then
+    if [[ "${group}" == "master" ]]; then
       group_ips=("${master_ips[@]}")
       group_hosts=("${master_hosts[@]}")
     else
@@ -253,7 +284,7 @@ cmd_ssh_copy() {
       ip="${group_ips[i]}"
       local host="${group_hosts[i]}"
       local password_b64="${host_pass_b64[${host}]}"
-      if [ -z "${password_b64}" ]; then
+      if [[ -z "${password_b64}" ]]; then
         logger error "secrets.yml 中缺少主机 ${host} 的 sudopass"
         failed=1
         continue
@@ -261,14 +292,13 @@ cmd_ssh_copy() {
       local password
       password="$(printf '%s' "${password_b64}" | base64 -d)"
       printf -v padded_ip '%-15s' "${ip}"
-      sshpass -p "${password}" ssh-copy-id \
+      if sshpass -p "${password}" ssh-copy-id \
           -o StrictHostKeyChecking=accept-new \
           -o ConnectTimeout=10 \
           -o ServerAliveInterval=5 \
           -o ServerAliveCountMax=3 \
           -o PasswordAuthentication=yes \
-          "${ssh_user}@${ip}" >/dev/null 2>&1
-      if [ $? -eq 0 ]; then
+          "${ssh_user}@${ip}" >/dev/null 2>&1; then
         logger info "分发到 ${group}：${host} ${padded_ip} 分发成功"
       else
         logger error "分发到 ${group}：${host} ${padded_ip} 分发失败"
@@ -277,7 +307,11 @@ cmd_ssh_copy() {
     done
   done
   unset password
-  [ "${failed}" -eq 0 ] && logger info "全部主机分发完成" || logger error "存在分发失败的主机 (退出码 ${failed})"
+  if [[ "${failed}" -eq 0 ]]; then
+    logger info "全部主机分发完成"
+  else
+    logger error "存在分发失败的主机 (退出码 ${failed})"
+  fi
   exit "${failed}"
 }
 
@@ -286,7 +320,7 @@ cmd_install_completion() {
   local comp_file="${HOME}/.rke2ctl.bash"
 
   local func_body
-  func_body="$(cat <<'FUNC'
+  func_body="$(cat <<'EOF'
 # rke2ctl tab 补全 (独立补全文件, 由 ~/.bashrc 加载)
 _rke2ctl() {
   local cur envs name
@@ -348,14 +382,17 @@ _rke2ctl() {
   esac
 }
 complete -F _rke2ctl ./rke2ctl rke2ctl
-FUNC
+EOF
 )"
   func_body="${func_body//__RKE2_REPO_ROOT__/${REPO_ROOT}}"
 
-  printf '%s\n' "${func_body}" > "${comp_file}" || { logger error "写入 ${comp_file} 失败"; exit 1; }
+  printf '%s\n' "${func_body}" > "${comp_file}" || {
+    logger error "写入 ${comp_file} 失败"
+    exit 1
+  }
   logger info "Tab 补全脚本已写入   ${comp_file}"
 
-  if [ -f "${bashrc}" ]; then
+  if [[ -f "${bashrc}" ]]; then
     grep -vF ".rke2ctl.bash" "${bashrc}" \
       | grep -vF "rke2ctl_completion.sh" \
       | grep -vF "complete -F _rke2ctl" \
@@ -367,7 +404,7 @@ FUNC
   fi
 
   printf '\n# rke2ctl tab 补全 (bash-completion)\nsource ~/.rke2ctl.bash\n' >> "${bashrc}" \
-    || { logger error "写入 ${bashrc} 失败"; exit 1; }
+      || { logger error "写入 ${bashrc} 失败"; exit 1; }
   logger info "已写入 ${bashrc}"
   logger info "执行命令加载: source ${bashrc}"
   echo " "
@@ -375,9 +412,10 @@ FUNC
 
 cmd_download() {
   # 参数: 环境名; rke2_version/arch/cni 均取自该环境 site.yml
-  [ "$#" -eq 1 ] || {
+  [[ $# -eq 1 ]] || {
     logger error "download 需要 1 个参数: 环境名"
-    usage >&2; exit 2
+    usage >&2
+    exit 2
   }
   local env_name="$1"
   local version arch_raw cni
@@ -388,25 +426,29 @@ cmd_download() {
     exit 2
   fi
   site_file="${INVENTORY_DIR}/${env_name}/site.yml"
-  [ -f "${site_file}" ] || {
+  [[ -f "${site_file}" ]] || {
     logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name} 或指定已有环境名"
     exit 1
   }
 
   # 解析顶层 rke2_version / arch 与 rke2_server.cni (兼容带引号与注释)
-  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
-  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
-              | head -1 | tr 'A-Z' 'a-z')"
-  # GitHub 加速镜像: 读环境 site.yml 的 download_proxy (空格分隔多个, 依次尝试), 留空则直连
-  download_proxy="$(sed -n 's/^download_proxy:[[:space:]]*["'\'']\{0,1\}\([^"'\'']*\).*/\1/p' "${site_file}" \
-                    | head -1 | sed 's/[[:space:]]*##.*//')"
-  cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
-         | head -1 | tr 'A-Z' 'a-z')"
-  logger info "环境 ${env_name} 配置: rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
+  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
+      "${site_file}" | head -n 1)"
+  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
+      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
+  # GitHub 加速镜像: 读环境 site.yml 的 download_proxy
+  # (空格分隔多个, 依次尝试), 留空则直连
+  download_proxy="$(sed -n 's/^download_proxy:[[:space:]]*["'\'']\{0,1\}\([^"'\'']*\).*/\1/p' \
+      "${site_file}" | head -n 1 | sed 's/[[:space:]]*##.*//')"
+  cni="$(sed -n 's/^[[:space:]]*cni:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
+      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
+  logger info "环境 ${env_name} 配置:"\
+    "rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
 
   # 版本格式校验 (如 v1.34.6+rke2r3, 兼容 hotfix 后缀)
   if ! [[ "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\+rke2r[0-9]+(\.[0-9a-zA-Z]+)*$ ]]; then
-    logger error "site.yml 中缺少合法的 rke2_version: ${version:-空} (示例: v1.34.6+rke2r3)"
+    logger error "site.yml 中缺少合法的 rke2_version:"\
+      "${version:-空} (示例: v1.34.6+rke2r3)"
     exit 2
   fi
   version_urlsafe="${version//+/%2B}"   # GitHub URL 中 + 必须编码为 %2B
@@ -415,10 +457,14 @@ cmd_download() {
   case "${arch_raw}" in
     amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
     arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *) logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+    *)
+      logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"
+      exit 2
+      ;;
   esac
 
-  # 目标目录 packages_rke2/<环境名>/<版本>/<架构>/ (架构目录用规范形式: amd64/arm64)
+  # 目标目录 packages_rke2/<环境名>/<版本>/<架构>/
+  # (架构目录用规范形式: amd64/arm64)
   dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}/${arch_short}"
   mkdir -p "${dest_dir}" || { logger error "创建目录失败: ${dest_dir}"; exit 1; }
 
@@ -458,14 +504,14 @@ cmd_download() {
         github_path="rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
     esac
 
-    if [ -s "${dest_dir}/${file}" ]; then
+    if [[ -s "${dest_dir}/${file}" ]]; then
       logger info "已存在, 跳过下载: ${file}"
       continue
     fi
 
     # 候选下载地址: GitHub 文件先依次走加速镜像, 最后兜底官方直连
     urls=()
-    if [ -n "${github_path}" ]; then
+    if [[ -n "${github_path}" ]]; then
       for mirror in "${github_mirrors[@]}"; do
         urls+=("${mirror}https://github.com/${github_path}")
       done
@@ -478,13 +524,13 @@ cmd_download() {
     for mirror_url in "${urls[@]}"; do
       logger info "正在下载: ${file} <- ${mirror_url}"
       if curl -fL --connect-timeout 10 --retry 2 --retry-delay 2 --retry-all-errors \
-           -o "${dest_dir}/${file}" "${mirror_url}"; then
+          -o "${dest_dir}/${file}" "${mirror_url}"; then
         fetch_ok=1
         break
       fi
       rm -f "${dest_dir}/${file}"   # 删除残file, 保证下次重下完整
     done
-    if [ "${fetch_ok}" -ne 1 ]; then
+    if [[ "${fetch_ok}" -ne 1 ]]; then
       logger error "下载失败: ${file} (全部加速镜像及官方直连均失败)"
       exit 1
     fi
@@ -492,18 +538,19 @@ cmd_download() {
 
   # 校验阶段 (sha256sum 文件条目格式: "hash  文件名" 双空格)
   local checksum_file="${dest_dir}/sha256sum-${arch_short}.txt"
-  [ -f "${checksum_file}" ] || { logger error "缺少校验文件 ${checksum_file}"; exit 1; }
+  [[ -f "${checksum_file}" ]] || { logger error "缺少校验文件 ${checksum_file}"; exit 1; }
   local expected actual failed=0
   for file in "${files[@]}"; do
-    # rke2-images-all 清单会被人为修改 (如去除 docker.io/ 前缀), 哈希校验无意义, 忽略
-    if [ "${file}" = "rke2-images-all.${arch_linux}.txt" ]; then
+    # rke2-images-all 清单会被人为修改 (如去除 docker.io/ 前缀),
+    # 哈希校验无意义, 忽略
+    if [[ "${file}" == "rke2-images-all.${arch_linux}.txt" ]]; then
       expected=""
     else
-      expected="$(grep -F "  ${file}" "${checksum_file}" | head -1 | awk '{print $1}')"
+      expected="$(grep -F "  ${file}" "${checksum_file}" | head -n 1 | awk '{print $1}')"
     fi
-    if [ -z "${expected}" ]; then
+    if [[ -z "${expected}" ]]; then
       # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
-      if [ -s "${dest_dir}/${file}" ]; then
+      if [[ -s "${dest_dir}/${file}" ]]; then
         logger info "非空检查通过: ${file}"
       else
         logger error "文件缺失或为空: ${file}"
@@ -512,7 +559,7 @@ cmd_download() {
       continue
     fi
     actual="$(sha256sum "${dest_dir}/${file}" | awk '{print $1}')"
-    if [ "${actual}" = "${expected}" ]; then
+    if [[ "${actual}" == "${expected}" ]]; then
       logger info "校验通过: ${file}"
     else
       logger error "校验失败: ${file} (期望 ${expected}, 实际 ${actual})"
@@ -521,7 +568,7 @@ cmd_download() {
     fi
   done
 
-  if [ "${failed}" -eq 0 ]; then
+  if [[ "${failed}" -eq 0 ]]; then
     logger info "全部下载完成并校验通过: ${dest_dir}"
   else
     logger error "存在失败项, 修复后重跑: ./rke2ctl download ${env_name}"
@@ -531,9 +578,10 @@ cmd_download() {
 
 cmd_pull() {
   # 参数: 环境名 [registry]; registry 缺省读环境 site.yml 的 global.docker_repo.host
-  if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+  if [[ $# -lt 1 || $# -gt 2 ]]; then
     logger error "pull 需要 1-2 个参数: 环境名 [registry]"
-    usage >&2; exit 2
+    usage >&2
+    exit 2
   fi
   local env_name="$1" registry_override="${2:-}"
 
@@ -542,23 +590,28 @@ cmd_pull() {
     exit 2
   fi
   local site_file="${INVENTORY_DIR}/${env_name}/site.yml"
-  [ -f "${site_file}" ] || {
+  [[ -f "${site_file}" ]] || {
     logger error "找不到 ${site_file}, 请先 ./rke2ctl new ${env_name}"
     exit 2
   }
 
   # 解析 rke2_version / arch (模式与 cmd_download 一致)
   local version arch_raw arch_linux arch_short
-  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" | head -1)"
-  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' "${site_file}" \
-              | head -1 | tr 'A-Z' 'a-z')"
+  version="$(sed -n 's/^rke2_version:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
+      "${site_file}" | head -n 1)"
+  arch_raw="$(sed -n 's/^arch:[[:space:]]*["'\'']\{0,1\}\([^"'\''[:space:]]*\).*/\1/p' \
+      "${site_file}" | head -n 1 | tr 'A-Z' 'a-z')"
   case "${arch_raw}" in
     amd|amd64) arch_linux="linux-amd64"; arch_short="amd64" ;;
     arm|arm64) arch_linux="linux-arm64"; arch_short="arm64" ;;
-    *) logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"; exit 2 ;;
+    *)
+      logger error "site.yml 中 arch 配置非法: ${arch_raw:-空} (可选: amd/amd64/arm/arm64)"
+      exit 2
+      ;;
   esac
 
-  # 解析 global.docker_repo 块内的 host/user/password (仅块内取值, 避免误取 db/k8s_user 块)
+  # 解析 global.docker_repo 块内的 host/user/password
+  # (仅块内取值, 避免误取 db/k8s_user 块)
   local repo_host="" repo_user="" repo_pass="" line in_repo=0
   local re_key="^[[:space:]]{2}[A-Za-z_][A-Za-z0-9_]*:"
   local re_host="^[[:space:]]{4}host:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
@@ -567,7 +620,7 @@ cmd_pull() {
   while IFS= read -r line; do
     if [[ "${line}" =~ ${re_key} ]]; then in_repo=0; fi
     if [[ "${line}" =~ ^[[:space:]]{2}docker_repo:[[:space:]]*$ ]]; then in_repo=1; continue; fi
-    if [ "${in_repo}" -eq 1 ]; then
+    if [[ "${in_repo}" -eq 1 ]]; then
       [[ "${line}" =~ ${re_host} ]] && repo_host="${BASH_REMATCH[1]}"
       [[ "${line}" =~ ${re_user} ]] && repo_user="${BASH_REMATCH[1]}"
       [[ "${line}" =~ ${re_pass} ]] && repo_pass="${BASH_REMATCH[1]}"
@@ -575,18 +628,19 @@ cmd_pull() {
   done < "${site_file}"
 
   local registry="${registry_override:-${repo_host}}"
-  if [ -z "${registry}" ]; then
-    logger error "site.yml 未配置 global.docker_repo.host, 请手动指定: ./rke2ctl pull ${env_name} <registry>"
+  if [[ -z "${registry}" ]]; then
+    logger error "site.yml 未配置 global.docker_repo.host, 请手动指定:"\
+      "./rke2ctl pull ${env_name} <registry>"
     exit 2
   fi
-  [ -n "${repo_user}" ] || {
+  [[ -n "${repo_user}" ]] || {
     logger error "site.yml 未配置 global.docker_repo.user, 无法 docker login"
     exit 2
   }
 
   # 定位离线包目录
   local dest_dir="${REPO_ROOT}/packages_rke2/${env_name}/${version}/${arch_short}"
-  [ -d "${dest_dir}" ] || {
+  [[ -d "${dest_dir}" ]] || {
     logger error "找不到离线包目录: ${dest_dir}"
     logger error "请先下载: ./rke2ctl download ${env_name}"
     exit 1
@@ -594,19 +648,34 @@ cmd_pull() {
 
   local image_list_file="${dest_dir}/rke2-images-all.${arch_linux}.txt"
   local loader="${dest_dir}/rancher-load-images.sh"
-  [ -f "${image_list_file}" ] || { logger error "缺少镜像清单: ${image_list_file}"; exit 1; }
-  [ -f "${loader}" ] || { logger error "缺少 ${loader}, 请重跑 ./rke2ctl download ${env_name}"; exit 1; }
+  [[ -f "${image_list_file}" ]] || {
+    logger error "缺少镜像清单: ${image_list_file}"
+    exit 1
+  }
+  [[ -f "${loader}" ]] || {
+    logger error "缺少 ${loader}, 请重跑 ./rke2ctl download ${env_name}"
+    exit 1
+  }
 
   # 镜像包: 仅 rke2-images*.tar.gz (排除 rke2.linux-*.tar.gz 二进制安装包)
   local -a tarballs=()
   local tarball
-  while IFS= read -r tarball; do tarballs+=("${tarball}"); done < <(ls "${dest_dir}"/rke2-images*.tar.gz 2>/dev/null)
-  [ "${#tarballs[@]}" -gt 0 ] || { logger error "未找到镜像包 rke2-images*.tar.gz: ${dest_dir}"; exit 1; }
+  for tarball in "${dest_dir}"/rke2-images*.tar.gz; do
+    [[ -e "${tarball}" ]] || continue
+    tarballs+=("${tarball}")
+  done
+  [[ ${#tarballs[@]} -gt 0 ]] || {
+    logger error "未找到镜像包 rke2-images*.tar.gz: ${dest_dir}"
+    exit 1
+  }
 
   # 提权前缀: root 或可直接操作 docker 时不加 sudo
   local sudo_cmd=""
-  if [ "$(id -u)" -ne 0 ] && ! docker info >/dev/null 2>&1; then
-    command -v sudo >/dev/null 2>&1 || { logger error "当前用户无 docker 权限且未安装 sudo"; exit 1; }
+  if [[ "$(id -u)" -ne 0 ]] && ! docker info >/dev/null 2>&1; then
+    command -v sudo >/dev/null 2>&1 || {
+      logger error "当前用户无 docker 权限且未安装 sudo"
+      exit 1
+    }
     sudo_cmd="sudo"
   fi
 
@@ -614,11 +683,13 @@ cmd_pull() {
   sed -i 's#docker.io/##g' "${image_list_file}"
   logger info "已去除镜像清单 registry 前缀 (docker.io/): ${image_list_file}"
 
-  # 2. docker login (密码经 stdin 不进进程列表; 与加载脚本同提权前缀, sudo 语境下凭据一致)
+  # 2. docker login (密码经 stdin 不进进程列表;
+  # 与加载脚本同提权前缀, sudo 语境下凭据一致)
   logger info "登录私有仓库: ${registry} (用户 ${repo_user})"
   if ! printf '%s\n' "${repo_pass}" | ${sudo_cmd} docker login "${registry}" \
-       -u "${repo_user}" --password-stdin >/dev/null 2>&1; then
-    logger error "docker login 失败: ${registry}, 请检查 site.yml 的 global.docker_repo.user/password"
+      -u "${repo_user}" --password-stdin >/dev/null 2>&1; then
+    logger error "docker login 失败: ${registry},"\
+      "请检查 site.yml 的 global.docker_repo.user/password"
     exit 1
   fi
   logger info "登录成功: ${registry}"
@@ -628,7 +699,8 @@ cmd_pull() {
   for tarball in "${tarballs[@]}"; do
     logger info "加载镜像包: $(basename "${tarball}") -> ${registry}"
     if ( cd "${dest_dir}" && ${sudo_cmd} bash rancher-load-images.sh \
-         -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${tarball}")" -r "${registry}" ); then
+        -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${tarball}")" \
+        -r "${registry}" ); then
       logger info "加载完成: $(basename "${tarball}")"
     else
       logger error "加载失败: $(basename "${tarball}")"
@@ -636,7 +708,7 @@ cmd_pull() {
     fi
   done
 
-  if [ "${failed}" -eq 0 ]; then
+  if [[ "${failed}" -eq 0 ]]; then
     logger info "全部镜像包加载完成: ${registry}"
   else
     logger error "存在加载失败的镜像包 (退出码 ${failed})"
@@ -646,7 +718,11 @@ cmd_pull() {
 
 main() {
   local cmd="${1:-}"
-  [[ -n "${cmd}" ]] || { logger warn "缺少命令, 可参考以下步骤:"; usage; exit 0; }
+  if [[ -z "${cmd}" ]]; then
+    logger warn "缺少命令, 可参考以下步骤:"
+    usage
+    exit 0
+  fi
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
@@ -654,7 +730,10 @@ main() {
     p|pull)       shift; cmd_pull "$@" ;;
     help|-h|--help) usage; exit 0 ;;
     bash-completion) shift; cmd_install_completion "$@" ;;
-    *)            usage; exit 0 ;;
+    *)
+      usage
+      exit 0
+      ;;
   esac
 }
 main "$@"
