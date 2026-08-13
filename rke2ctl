@@ -117,6 +117,93 @@ resolve_arch() {
   esac
 }
 
+# 解析 site.yml 的 global.docker_repo 块, 提取 host/user/password
+# (仅块内取值, 避免误取 db/k8s_user 等其他块)
+# 用法: read_docker_repo <site.yml路径> <host变量> <user变量> <pass变量>
+read_docker_repo() {
+  local site_file="$1" host_var="$2" user_var="$3" pass_var="$4"
+  local host_val="" user_val="" pass_val="" line in_repo=0
+  local re_key="^[[:space:]]{2}[A-Za-z_][A-Za-z0-9_]*:"
+  local re_host="^[[:space:]]{4}host:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  local re_user="^[[:space:]]{4}user:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  local re_pass="^[[:space:]]{4}password:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ${re_key} ]]; then in_repo=0; fi
+    if [[ "${line}" =~ ^[[:space:]]{2}docker_repo:[[:space:]]*$ ]]; then in_repo=1; continue; fi
+    if [[ "${in_repo}" -eq 1 ]]; then
+      [[ "${line}" =~ ${re_host} ]] && host_val="${BASH_REMATCH[1]}"
+      [[ "${line}" =~ ${re_user} ]] && user_val="${BASH_REMATCH[1]}"
+      [[ "${line}" =~ ${re_pass} ]] && pass_val="${BASH_REMATCH[1]}"
+    fi
+  done < "${site_file}"
+  printf -v "${host_var}" '%s' "${host_val}"
+  printf -v "${user_var}" '%s' "${user_val}"
+  printf -v "${pass_var}" '%s' "${pass_val}"
+}
+
+# 解析 hosts 清单, 每行输出 "master|worker <主机名> <IP>" (按 IP 去重)
+# 用法: parse_hosts <hosts文件路径>
+parse_hosts() {
+  local hosts_file="$1"
+  awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    /^[[:space:]]*\[/ {
+      role = ($0 ~ /rke2_server/) ? "master" \
+        : (($0 ~ /rke2_agent/) ? "worker" : "")
+      next
+    }
+    role != "" && match($0, /ansible_host=[0-9.]+/) {
+      ansible_ip = substr($0, RSTART + 13, RLENGTH - 13)
+      if (!seen[role, ansible_ip]++) { print role, $1, ansible_ip }
+    }
+  ' "${hosts_file}"
+}
+
+# 解密 secrets.yml 输出明文 (stdout 供调用方捕获, 失败由调用方处理)
+# 用法: vault_view <加密文件路径>
+vault_view() {
+  local secrets_file="$1"
+  ansible-vault view "${secrets_file}" 2>/dev/null
+}
+
+# 校验离线包目录: sha256sum 有条目则校验哈希, 无条目仅做非空检查
+# (rke2-images-all 清单会被人为修改, 哈希校验无意义, 跳过)
+# 用法: verify_checksums <checksum文件> <目标目录> <arch_linux> <文件>...
+# 返回: 0=全部通过 1=存在失败项 (不主动退出, 由调用方汇总)
+verify_checksums() {
+  local checksum_file="$1" target_dir="$2" arch_linux="$3"
+  shift 3
+  local -a files=("$@")
+  local expected actual failed=0 file
+  for file in "${files[@]}"; do
+    if [[ "${file}" == "rke2-images-all.${arch_linux}.txt" ]]; then
+      expected=""
+    else
+      expected="$(grep -F "  ${file}" "${checksum_file}" | head -n 1 | awk '{print $1}')"
+    fi
+    if [[ -z "${expected}" ]]; then
+      # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
+      if [[ -s "${target_dir}/${file}" ]]; then
+        logger info "非空检查通过: ${file}"
+      else
+        logger error "文件缺失或为空: ${file}"
+        failed=1
+      fi
+      continue
+    fi
+    actual="$(sha256sum "${target_dir}/${file}" | awk '{print $1}')"
+    if [[ "${actual}" == "${expected}" ]]; then
+      logger info "校验通过: ${file}"
+    else
+      logger error "校验失败: ${file} (期望 ${expected}, 实际 ${actual})"
+      logger error "请删除后重下: rm -f '${target_dir}/${file}'"
+      failed=1
+    fi
+  done
+  return "${failed}"
+}
+
 # ------------------------------------------------------------------
 # 帮助与子命令
 # ------------------------------------------------------------------
@@ -274,19 +361,7 @@ cmd_ssh_copy() {
       master) master_ips+=("${ip}"); master_hosts+=("${host}") ;;
       worker) worker_ips+=("${ip}"); worker_hosts+=("${host}") ;;
     esac
-  done < <(awk '
-    /^[[:space:]]*#/ { next }
-    /^[[:space:]]*$/ { next }
-    /^[[:space:]]*\[/ {
-      role = ($0 ~ /rke2_server/) ? "master" \
-        : (($0 ~ /rke2_agent/) ? "worker" : "")
-      next
-    }
-    role != "" && match($0, /ansible_host=[0-9.]+/) {
-      ansible_ip = substr($0, RSTART + 13, RLENGTH - 13)
-      if (!seen[role, ansible_ip]++) { print role, $1, ansible_ip }
-    }
-  ' "${hosts_file}")
+  done < <(parse_hosts "${hosts_file}")
 
   local total=$(( ${#master_ips[@]} + ${#worker_ips[@]} ))
   if [[ "${total}" -eq 0 ]]; then
@@ -327,7 +402,7 @@ cmd_ssh_copy() {
   require_cmd ansible-vault "请先安装 ansible"
   logger info "正在解密 ${secrets_file} (请输入 vault 密码)"
   local vault_text
-  vault_text="$(ansible-vault view "${secrets_file}" 2>/dev/null)" || {
+  vault_text="$(vault_view "${secrets_file}")" || {
     logger error "secrets.yml 解密失败, 请检查 vault 密码"
     exit 1
   }
@@ -609,34 +684,9 @@ cmd_download() {
   # 校验阶段 (sha256sum 文件条目格式: "hash  文件名" 双空格)
   local checksum_file="${dest_dir}/sha256sum-${arch_short}.txt"
   [[ -f "${checksum_file}" ]] || { logger error "缺少校验文件 ${checksum_file}"; exit 1; }
-  local expected actual failed=0
-  for file in "${files[@]}"; do
-    # rke2-images-all 清单会被人为修改 (如去除 docker.io/ 前缀),
-    # 哈希校验无意义, 忽略
-    if [[ "${file}" == "rke2-images-all.${arch_linux}.txt" ]]; then
-      expected=""
-    else
-      expected="$(grep -F "  ${file}" "${checksum_file}" | head -n 1 | awk '{print $1}')"
-    fi
-    if [[ -z "${expected}" ]]; then
-      # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
-      if [[ -s "${dest_dir}/${file}" ]]; then
-        logger info "非空检查通过: ${file}"
-      else
-        logger error "文件缺失或为空: ${file}"
-        failed=1
-      fi
-      continue
-    fi
-    actual="$(sha256sum "${dest_dir}/${file}" | awk '{print $1}')"
-    if [[ "${actual}" == "${expected}" ]]; then
-      logger info "校验通过: ${file}"
-    else
-      logger error "校验失败: ${file} (期望 ${expected}, 实际 ${actual})"
-      logger error "请删除后重下: rm -f '${dest_dir}/${file}'"
-      failed=1
-    fi
-  done
+  local failed=0
+  verify_checksums "${checksum_file}" "${dest_dir}" "${arch_linux}" "${files[@]}"
+  failed=$?
 
   if [[ "${failed}" -eq 0 ]]; then
     logger info "全部下载完成并校验通过: ${dest_dir}"
@@ -673,21 +723,8 @@ cmd_pull() {
   resolve_arch "${arch_raw}" arch_linux arch_short
 
   # 解析 global.docker_repo 块内的 host/user/password
-  # (仅块内取值, 避免误取 db/k8s_user 块)
-  local repo_host="" repo_user="" repo_pass="" line in_repo=0
-  local re_key="^[[:space:]]{2}[A-Za-z_][A-Za-z0-9_]*:"
-  local re_host="^[[:space:]]{4}host:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
-  local re_user="^[[:space:]]{4}user:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
-  local re_pass="^[[:space:]]{4}password:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
-  while IFS= read -r line; do
-    if [[ "${line}" =~ ${re_key} ]]; then in_repo=0; fi
-    if [[ "${line}" =~ ^[[:space:]]{2}docker_repo:[[:space:]]*$ ]]; then in_repo=1; continue; fi
-    if [[ "${in_repo}" -eq 1 ]]; then
-      [[ "${line}" =~ ${re_host} ]] && repo_host="${BASH_REMATCH[1]}"
-      [[ "${line}" =~ ${re_user} ]] && repo_user="${BASH_REMATCH[1]}"
-      [[ "${line}" =~ ${re_pass} ]] && repo_pass="${BASH_REMATCH[1]}"
-    fi
-  done < "${site_file}"
+  local repo_host repo_user repo_pass
+  read_docker_repo "${site_file}" repo_host repo_user repo_pass
 
   local registry="${registry_override:-${repo_host}}"
   if [[ -z "${registry}" ]]; then
