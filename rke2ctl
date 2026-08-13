@@ -45,11 +45,12 @@ usage() {
   ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
 
 示例:
-  ./rke2ctl new zxjt-k99                                      创建部署环境
-  ./rke2ctl setup zxjt-k99 ssh-copy                           分发公钥
-  ./rke2ctl setup zxjt-k99 rke2-server                        部署 k8s-master
-  ./rke2ctl setup zxjt-k99 rke2-agent                         部署 k8s-worker
-  ./rke2ctl download zxjt-k99                                 按 zxjt-k99 的 rke2_version/arch/cni 配置下载
+  ./rke2ctl new cq-moone-k45                                      创建部署环境
+  ./rke2ctl download cq-moone-k45                                 按 cq-moone-k45 的 rke2_version/arch/cni 配置下载
+  ./rke2ctl setup cq-moone-k45 ssh-copy                           分发公钥
+  ./rke2ctl setup cq-moone-k45 rke2-server                        部署 k8s-master
+  ./rke2ctl setup cq-moone-k45 rke2-agent                         部署 k8s-worker
+
 EOF
 }
 
@@ -479,7 +480,12 @@ cmd_download() {
   [ -f "${checksums}" ] || { logger error "缺少校验文件 ${checksums}"; exit 1; }
   local expected actual fail=0
   for file in "${files[@]}"; do
-    expected="$(grep -F "  ${file}" "${checksums}" | head -1 | awk '{print $1}')"
+    # rke2-images-all 清单会被人为修改 (如去除 docker.io/ 前缀), 哈希校验无意义, 忽略
+    if [ "${file}" = "rke2-images-all.${arch_linux}.txt" ]; then
+      expected=""
+    else
+      expected="$(grep -F "  ${file}" "${checksums}" | head -1 | awk '{print $1}')"
+    fi
     if [ -z "${expected}" ]; then
       # install.sh / rancher-load-images.sh / sha256sum 自身无校验条目, 仅做非空检查
       if [ -s "${dest_dir}/${file}" ]; then
@@ -521,3 +527,4 @@ main() {
   esac
 }
 main "$@"
+
