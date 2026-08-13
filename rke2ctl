@@ -1,8 +1,15 @@
 #!/bin/bash
 ## ============================================================
-## rke2ctl RKE2 多环境部署管理工具                          ###   
+## rke2ctl — RKE2 多环境部署管理工具
 ## ============================================================
 
+# ------------------------------------------------------------------
+# 日志输出
+# ------------------------------------------------------------------
+
+# 分级彩色日志, 输出含时间戳与调用位置 [文件:行号]
+# 用法: logger <debug|info|warn|error> <消息...>
+# 消息支持多参数, 以空格连接 (便于超长消息折行书写)
 logger() {
   local timestamp=$(date +'%Y-%m-%d %H:%M:%S')
   local caller_file=$(basename "${BASH_SOURCE[1]}")
@@ -25,6 +32,11 @@ logger() {
   esac
 }
 
+# ------------------------------------------------------------------
+# 全局初始化
+# ------------------------------------------------------------------
+
+# 解析符号链接得到脚本真实路径, 定位仓库根目录 (支持经符号链接调用)
 script_path="${BASH_SOURCE[0]}"
 while [[ -h "${script_path}" ]]; do
   script_dir="$(cd -P "$(dirname "${script_path}")" && pwd)"
@@ -35,6 +47,18 @@ REPO_ROOT="$(cd -P "$(dirname "${script_path}")" && pwd)"
 cd "${REPO_ROOT}" || { logger error "无法进入仓库目录 ${REPO_ROOT}"; exit 1; }
 INVENTORY_DIR="${REPO_ROOT}/inventory"
 
+# ------------------------------------------------------------------
+# 公共辅助函数
+# ------------------------------------------------------------------
+
+# 校验环境名合法性: 仅允许字母/数字/下划线/连字符
+valid_env_name() { [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
+
+# ------------------------------------------------------------------
+# 帮助与子命令
+# ------------------------------------------------------------------
+
+# 打印帮助信息
 usage() {
   echo -e "\033[33mUsage:\033[0m ./rke2ctl <command> [args]"
   cat <<'EOF'
@@ -56,8 +80,9 @@ usage() {
 EOF
 }
 
-valid_env_name() { [[ "$1" =~ ^[A-Za-z0-9_-]+$ ]]; }
-
+# 创建新部署环境: 复制 inventory/sample 模板并加密 secrets.yml
+# 用法: cmd_new <环境名>
+# 退出码: 0=成功 1=运行错误 2=参数错误
 cmd_new() {
   [[ $# -eq 1 ]] || {
     logger error "new 需要 1 个参数: 环境名"
@@ -110,6 +135,9 @@ cmd_new() {
 EOF
 }
 
+# 部署分发: ssh-copy 转 cmd_ssh_copy, rke2-server/rke2-agent 走 ansible-playbook
+# 用法: cmd_setup <环境名> <ssh-copy|rke2-server|rke2-agent>
+# 退出码: 0=成功 1=运行错误 2=参数错误
 cmd_setup() {
   [[ $# -eq 2 ]] || {
     logger error "setup 需要 2 个参数: 环境名 与 部署类型"
@@ -173,6 +201,9 @@ cmd_setup() {
   exit "${rc}"
 }
 
+# 分发 SSH 公钥: 解析 hosts 与 secrets.yml, 按主机逐台 sshpass+ssh-copy-id
+# 用法: cmd_ssh_copy <环境目录>
+# 退出码: 0=成功 1=运行错误
 cmd_ssh_copy() {
   local env_dir="$1"
   local hosts_file="${env_dir}/hosts"
@@ -315,6 +346,9 @@ cmd_ssh_copy() {
   exit "${failed}"
 }
 
+# 生成 ~/.rke2ctl.bash 补全脚本并注入 ~/.bashrc (幂等)
+# 用法: cmd_install_completion
+# 退出码: 0=成功 1=运行错误
 cmd_install_completion() {
   local bashrc="${HOME}/.bashrc"
   local comp_file="${HOME}/.rke2ctl.bash"
@@ -392,6 +426,8 @@ EOF
   }
   logger info "Tab 补全脚本已写入   ${comp_file}"
 
+  # 重写 ~/.bashrc: 剔除历史版本注入的补全行并压缩连续空行
+  # (直接覆盖, 无备份, 保持既有行为)
   if [[ -f "${bashrc}" ]]; then
     grep -vF ".rke2ctl.bash" "${bashrc}" \
       | grep -vF "rke2ctl_completion.sh" \
@@ -410,8 +446,11 @@ EOF
   echo " "
 }
 
+# 离线下载 RKE2 安装包与镜像包至 packages_rke2/<环境名>/<版本>/<架构>/
+# rke2_version/arch/cni 均取自该环境 site.yml
+# 用法: cmd_download <环境名>
+# 退出码: 0=成功 1=运行错误 2=参数错误
 cmd_download() {
-  # 参数: 环境名; rke2_version/arch/cni 均取自该环境 site.yml
   [[ $# -eq 1 ]] || {
     logger error "download 需要 1 个参数: 环境名"
     usage >&2
@@ -477,10 +516,7 @@ cmd_download() {
     "rke2-images-all.${arch_linux}.txt"
     "rke2-images.${arch_linux}.tar.gz"
   )
-  # 按 cni 值追加对应的 CNI 镜像包 (.tar.gz + .txt)
-#    *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz" "rke2-images-cilium.${arch_linux}.txt") ;;
-#    *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz"  "rke2-images-canal.${arch_linux}.txt")  ;;
-#    *calico*) files+=("rke2-images-calico.${arch_linux}.tar.gz" "rke2-images-calico.${arch_linux}.txt") ;;
+  # 按 cni 值追加对应的 CNI 镜像包
   case "${cni}" in
     *cilium*) files+=("rke2-images-cilium.${arch_linux}.tar.gz") ;;
     *canal*)  files+=("rke2-images-canal.${arch_linux}.tar.gz")  ;;
@@ -499,6 +535,7 @@ cmd_download() {
       install.sh)
         url="https://get.rke2.io" ;;
       rancher-load-images.sh)
+        # 固定 v2.15.0: 该脚本随 rancher release 发布, 无滚动 latest 版本
         github_path="rancher/rancher/releases/download/v2.15.0/rancher-load-images.sh" ;;
       *)
         github_path="rancher/rke2/releases/download/${version_urlsafe}/${file}" ;;
@@ -528,7 +565,7 @@ cmd_download() {
         fetch_ok=1
         break
       fi
-      rm -f "${dest_dir}/${file}"   # 删除残file, 保证下次重下完整
+      rm -f "${dest_dir}/${file}"   # 删除残留文件, 保证下次重下完整
     done
     if [[ "${fetch_ok}" -ne 1 ]]; then
       logger error "下载失败: ${file} (全部加速镜像及官方直连均失败)"
@@ -576,8 +613,11 @@ cmd_download() {
   fi
 }
 
+# 离线镜像导入私有仓库: 去 docker.io/ 前缀、docker login、逐个加载镜像包
+# registry 缺省读环境 site.yml 的 global.docker_repo.host
+# 用法: cmd_pull <环境名> [registry]
+# 退出码: 0=成功 1=运行错误 2=参数错误
 cmd_pull() {
-  # 参数: 环境名 [registry]; registry 缺省读环境 site.yml 的 global.docker_repo.host
   if [[ $# -lt 1 || $# -gt 2 ]]; then
     logger error "pull 需要 1-2 个参数: 环境名 [registry]"
     usage >&2
@@ -679,7 +719,7 @@ cmd_pull() {
     sudo_cmd="sudo"
   fi
 
-  # 1. 去 registry 前缀 (docker.io/), 幂等
+  # 1. 去 registry 前缀 (docker.io/), 幂等; sed -i 就地修改镜像清单文件
   sed -i 's#docker.io/##g' "${image_list_file}"
   logger info "已去除镜像清单 registry 前缀 (docker.io/): ${image_list_file}"
 
@@ -716,6 +756,11 @@ cmd_pull() {
   exit "${failed}"
 }
 
+# ------------------------------------------------------------------
+# 入口
+# ------------------------------------------------------------------
+
+# 命令分发入口
 main() {
   local cmd="${1:-}"
   if [[ -z "${cmd}" ]]; then
