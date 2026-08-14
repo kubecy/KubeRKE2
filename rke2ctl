@@ -162,19 +162,35 @@ usage() {
 用法:
   ./rke2ctl help                                             显示本帮助
   ./rke2ctl bash-completion                                  启用 tab 补全
+  ./rke2ctl list                                             列出全部环境 (sample 除外)
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
-  ./rke2ctl download <环境名>                               离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
-  ./rke2ctl pull <环境名> [registry]                        离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
+  ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
+  ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
 
 示例:
-  ./rke2ctl new cq-moone-k45                                      创建部署环境
-  ./rke2ctl download cq-moone-k45                                 按 cq-moone-k45 的 rke2_version/arch/cni 配置下载
-  ./rke2ctl setup cq-moone-k45 ssh-copy                           分发公钥
-  ./rke2ctl setup cq-moone-k45 rke2-server                        部署 k8s-master
-  ./rke2ctl setup cq-moone-k45 rke2-agent                         部署 k8s-worker
+  ./rke2ctl new cq-moone-k45                                 创建部署环境
+  ./rke2ctl download cq-moone-k45                            按 cq-moone-k45 的 rke2_version/arch/cni 配置下载
+  ./rke2ctl setup cq-moone-k45 ssh-copy                      分发公钥
+  ./rke2ctl setup cq-moone-k45 rke2-server                   部署 k8s-master
+  ./rke2ctl setup cq-moone-k45 rke2-agent                    部署 k8s-worker
 
 EOF
+}
+
+cmd_list() {
+  [[ $# -eq 0 ]] || {
+    logger error "list 不需要参数"
+    usage >&2
+    exit 2
+  }
+  local env_dir name
+  for env_dir in "${INVENTORY_DIR}"/*/; do
+    [[ -d "${env_dir}" ]] || continue
+    name="$(basename "${env_dir}")"
+    [[ "${name}" == "sample" ]] && continue
+    printf '%s\n' "${name}"
+  done
 }
 
 cmd_new() {
@@ -427,7 +443,7 @@ _rke2ctl() {
   cur="${COMP_WORDS[COMP_CWORD]}"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "new setup download pull help bash-completion" -- "${cur}")
+    mapfile -t COMPREPLY < <(compgen -W "new list setup download pull help bash-completion" -- "${cur}")
     return 0
   fi
 
@@ -467,7 +483,7 @@ EOF
 
   printf '\n# rke2ctl tab 补全 (bash-completion)\nsource ~/.rke2ctl.bash\n' >> "${bashrc}" \
       || { logger error "写入 ${bashrc} 失败"; exit 1; }
-  logger info "已写入 ${bashrc}"
+  logger info "已写入: ${bashrc}"
   logger info "执行命令加载: source ${bashrc}"
   echo " "
 }
@@ -699,6 +715,7 @@ main() {
   fi
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
+    list)         shift; cmd_list "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     d|download)   shift; cmd_download "$@" ;;
     p|pull)       shift; cmd_pull "$@" ;;
