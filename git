@@ -1,8 +1,9 @@
 #!/bin/bash
- 
 
 [[ -z "$1" ]] && echo "提交信息不能为空" && exit 1
 
+COMMIT_MSG="$(date '+%Y-%m-%d %H:%M:%S') $1"
+
 git add . &&
-git commit -m "$1" &&
+git commit -m "${COMMIT_MSG}" &&
 git push -u origin main && echo "推送成功" || echo "推送失败"
