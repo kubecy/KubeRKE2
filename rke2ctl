@@ -164,6 +164,7 @@ usage() {
   ./rke2ctl bash-completion                                  启用 tab 补全
   ./rke2ctl list                                             列出全部环境 (sample 除外)
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets 并建 packages_rke2 目录
+  ./rke2ctl del   <环境名>                                   删除部署环境 (inventory/ 与 packages_rke2/ 下同名目录)
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
   ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
   ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
@@ -241,6 +242,41 @@ cmd_new() {
   6. ./rke2ctl setup ${env_name} rke2-agent     部署 k8s-work
 ============================================================
 EOF
+}
+
+cmd_del() {
+  [[ $# -eq 1 ]] || {
+    logger error "del 需要 1 个参数: 环境名"
+    usage >&2
+    exit 2
+  }
+  local env_name="$1"
+
+  require_valid_env "${env_name}"
+
+  if [[ "${env_name}" == "sample" ]]; then
+    logger error "sample 为模板环境, 禁止删除"
+    exit 2
+  fi
+
+  local env_dir="${INVENTORY_DIR}/${env_name}"
+  local packages_dir="${REPO_ROOT}/packages_rke2/${env_name}"
+  if [[ ! -d "${env_dir}" ]] && [[ ! -d "${packages_dir}" ]]; then
+    logger error "环境 ${env_name} 不存在: ${env_dir} 与 ${packages_dir}"
+    exit 2
+  fi
+
+  local answer
+  read -r -p "请确定是否删除 ${env_name} 部署环境? (Yes|No): " answer
+  case "${answer,,}" in
+    yes|y)
+      rm -rf "${env_dir}" "${packages_dir}"
+      logger info "已删除环境 ${env_name}: ${env_dir} 与 ${packages_dir}"
+      ;;
+    *)
+      logger info "已取消, 未删除任何文件"
+      ;;
+  esac
 }
 
 cmd_setup() {
@@ -447,14 +483,14 @@ _rke2ctl() {
   cur="${COMP_WORDS[COMP_CWORD]}"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "new list setup download pull help bash-completion" -- "${cur}")
+    mapfile -t COMPREPLY < <(compgen -W "new del list setup download pull help bash-completion" -- "${cur}")
     return 0
   fi
 
   case "${COMP_WORDS[1]}" in
     new)
       ;;
-    download|pull|setup)
+    del|download|pull|setup)
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$(_rke2ctl_envs)" -- "${cur}")
       elif [[ "${COMP_WORDS[1]}" == "setup" && "${COMP_CWORD}" -eq 3 ]]; then
@@ -488,7 +524,8 @@ EOF
   printf '\n# rke2ctl tab 补全 (bash-completion)\nsource ~/.rke2ctl.bash\n' >> "${bashrc}" \
       || { logger error "写入 ${bashrc} 失败"; exit 1; }
   logger info "已写入: ${bashrc}"
-  logger info "执行命令加载: source ${bashrc}"
+  exec bash
+  #logger info "执行命令加载: source ${bashrc}"
   echo " "
 }
 
@@ -719,6 +756,7 @@ main() {
   fi
   case "${cmd}" in
     new)          shift; cmd_new "$@" ;;
+    del)          shift; cmd_del "$@" ;;
     list)         shift; cmd_list "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     d|download)   shift; cmd_download "$@" ;;
