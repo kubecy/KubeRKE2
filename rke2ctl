@@ -163,7 +163,7 @@ usage() {
   ./rke2ctl help                                             显示本帮助
   ./rke2ctl bash-completion                                  启用 tab 补全
   ./rke2ctl list                                             列出全部环境 (sample 除外)
-  ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets
+  ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets 并建 packages_rke2 目录
   ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
   ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
   ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
@@ -225,6 +225,10 @@ cmd_new() {
     exit 1
   fi
   logger info "secrets.yml 加密成功"
+
+  local packages_dir="${REPO_ROOT}/packages_rke2/${env_name}"
+  mkdir -p "${packages_dir}" || { logger error "创建目录失败: ${packages_dir}"; exit 1; }
+  logger info "已创建离线包目录: ${packages_dir}"
 
   cat <<EOF
 ============================================================
