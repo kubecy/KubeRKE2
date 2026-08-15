@@ -165,9 +165,9 @@ usage() {
   ./rke2ctl list                                             列出全部环境 (sample 除外)
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets 并建 packages_rke2 目录
   ./rke2ctl del   <环境名>                                   删除部署环境 (inventory/ 与 packages_rke2/ 下同名目录)
-  ./rke2ctl setup <环境名> <ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-work
-  ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml
-  ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
+  ./rke2ctl setup <环境名> <all|ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-worker, all 为先部署 rke2-server 再部署 rke2-agent
+  ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml, 配置了 global.kube_vip_version 时一并导出 kube-vip 镜像包并追加镜像清单
+  ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz 及 kube-vip-image*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
 
 示例:
   ./rke2ctl new cq-moone-k45                                 创建部署环境
@@ -175,6 +175,7 @@ usage() {
   ./rke2ctl setup cq-moone-k45 ssh-copy                      分发公钥
   ./rke2ctl setup cq-moone-k45 rke2-server                   部署 k8s-master
   ./rke2ctl setup cq-moone-k45 rke2-agent                    部署 k8s-worker
+  ./rke2ctl setup cq-moone-k45 all                           先部署 k8s-master 再部署 k8s-worker
 
 EOF
 }
@@ -288,10 +289,10 @@ cmd_setup() {
   local env_name="$1" node_type="$2"
 
   case "${node_type}" in
-    rke2-server|rke2-agent|ssh-copy) ;;
+    all|rke2-server|rke2-agent|ssh-copy) ;;
     *)
       logger error "无效的部署类型: ${node_type}, 可选值:"\
-        "rke2-server / rke2-agent / ssh-copy"
+        "all / rke2-server / rke2-agent / ssh-copy"
       exit 2
       ;;
   esac
@@ -320,20 +321,30 @@ cmd_setup() {
 
   require_cmd ansible-playbook "请先安装 ansible"
 
-  logger info "开始部署: ${env_name} (${node_type})"
-  logger info "执行: ansible-playbook -i inventory/${env_name}/hosts"\
-    "--ask-vault-pass -e env_dir=${env_dir} playbooks/${node_type}.yml"
-
-  ansible-playbook -i "inventory/${env_name}/hosts" \
-      --ask-vault-pass -e "env_dir=${env_dir}" "playbooks/${node_type}.yml"
-  local rc=$?
-  if [[ "${rc}" -eq 0 ]]; then
-    logger info "部署完成 (退出码 0)"
+  local -a playbooks
+  if [[ "${node_type}" == "all" ]]; then
+    playbooks=("rke2-server.yml" "rke2-agent.yml")
   else
-    logger error "部署失败 (退出码 ${rc}: 1=执行错误 2=主机不可达"\
-      "3=解析错误 99=中断)"
+    playbooks=("${node_type}.yml")
   fi
-  exit "${rc}"
+
+  local playbook rc
+  for playbook in "${playbooks[@]}"; do
+    logger info "开始部署: ${env_name} (${playbook%.yml})"
+    logger info "执行: ansible-playbook -i inventory/${env_name}/hosts"\
+      "--ask-vault-pass -e env_dir=${env_dir} playbooks/${playbook}"
+
+    ansible-playbook -i "inventory/${env_name}/hosts" \
+        --ask-vault-pass -e "env_dir=${env_dir}" "playbooks/${playbook}"
+    rc=$?
+    if [[ "${rc}" -ne 0 ]]; then
+      logger error "部署失败: ${playbook%.yml} (退出码 ${rc}: 1=执行错误"\
+        "2=主机不可达 3=解析错误 99=中断)"
+      exit "${rc}"
+    fi
+  done
+  logger info "部署完成 (退出码 0)"
+  exit 0
 }
 
 cmd_ssh_copy() {
@@ -494,7 +505,7 @@ _rke2ctl() {
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$(_rke2ctl_envs)" -- "${cur}")
       elif [[ "${COMP_WORDS[1]}" == "setup" && "${COMP_CWORD}" -eq 3 ]]; then
-        mapfile -t COMPREPLY < <(compgen -W "rke2-server rke2-agent ssh-copy" -- "${cur}")
+        mapfile -t COMPREPLY < <(compgen -W "all rke2-server rke2-agent ssh-copy" -- "${cur}")
       fi
       ;;
   esac
@@ -552,6 +563,7 @@ cmd_download() {
   site_get_proxy "${site_file}" download_proxy
   site_get_field "${site_file}" '^[[:space:]]*cni' cni
   cni="$(printf '%s' "${cni}" | tr 'A-Z' 'a-z')"
+  site_get_field "${site_file}" '^[[:space:]]\{2\}kube_vip_version' kube_vip_version
   logger info "环境 ${env_name} 配置:"\
     "rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
 
@@ -633,6 +645,43 @@ cmd_download() {
   verify_checksums "${checksum_file}" "${dest_dir}" "${arch_linux}" "${files[@]}"
   failed=$?
 
+  if [[ -n "${kube_vip_version}" ]]; then
+    local kv_image="ghcr.m.daocloud.io/kube-vip/kube-vip:${kube_vip_version}"
+    local kv_tag="rancher/kube-vip-kube-vip:${kube_vip_version}"
+    local kv_tarball="${dest_dir}/kube-vip-image-${kube_vip_version}.tar.gz"
+    local kv_list="${dest_dir}/rke2-images-all.${arch_linux}.txt"
+    if [[ ! -s "${kv_tarball}" ]]; then
+      require_cmd docker "请先安装 docker"
+      local kv_sudo_cmd=""
+      if [[ "$(id -u)" -ne 0 ]] && ! docker info >/dev/null 2>&1; then
+        require_cmd sudo "当前用户无 docker 权限且未安装 sudo"
+        kv_sudo_cmd="sudo"
+      fi
+      logger info "拉取 kube-vip 镜像: ${kv_image}"
+      if ! ${kv_sudo_cmd} docker pull --platform "linux/${arch_short}" "${kv_image}"; then
+        logger error "docker pull 失败: ${kv_image} (请确认 ghcr.m.daocloud.io 可达或检查 kube_vip_version)"
+        exit 1
+      fi
+      ${kv_sudo_cmd} docker tag "${kv_image}" "${kv_tag}"
+      logger info "导出镜像: $(basename "${kv_tarball}")"
+      if ! ${kv_sudo_cmd} docker save "${kv_tag}" | gzip > "${kv_tarball}"; then
+        logger error "docker save 失败: $(basename "${kv_tarball}")"
+        rm -f "${kv_tarball}"
+        exit 1
+      fi
+    else
+      logger info "已存在, 跳过下载: $(basename "${kv_tarball}")"
+    fi
+    if ! grep -qF "${kv_tag}" "${kv_list}"; then
+      printf '%s\n' "${kv_tag}" >> "${kv_list}"
+      logger info "镜像清单已追加: ${kv_tag}"
+    else
+      logger info "镜像清单已包含: ${kv_tag}"
+    fi
+  else
+    logger warn "site.yml 未配置 global.kube_vip_version, 跳过 kube-vip 镜像下载"
+  fi
+
   if [[ "${failed}" -eq 0 ]]; then
     logger info "全部下载完成并校验通过: ${dest_dir}"
   else
@@ -696,7 +745,7 @@ cmd_pull() {
 
   local -a tarballs=()
   local tarball
-  for tarball in "${dest_dir}"/rke2-images*.tar.gz; do
+  for tarball in "${dest_dir}"/rke2-images*.tar.gz "${dest_dir}"/kube-vip-image-*.tar.gz; do
     [[ -e "${tarball}" ]] || continue
     tarballs+=("${tarball}")
   done
@@ -727,10 +776,17 @@ cmd_pull() {
   logger info "登录成功: ${registry}"
 
   local failed=0
+  local tmp_local tmp_list
+  tmp_local="$(mktemp)"
+  tmp_list="$(mktemp)"
+  trap 'rm -f "${tmp_local}" "${tmp_list}"' EXIT
   for tarball in "${tarballs[@]}"; do
-    logger info "加载镜像包: $(basename "${tarball}") -> ${registry}"
+    ${sudo_cmd} docker images --format '{{.Repository}}:{{.Tag}}' | sort -u > "${tmp_local}"
+    grep -Fx -f "${tmp_local}" "${image_list_file}" > "${tmp_list}" || true
+    logger info "加载镜像包: $(basename "${tarball}") -> ${registry}"\
+      "(清单按本地已加载镜像过滤为 $(wc -l < "${tmp_list}") 行)"
     if ( cd "${dest_dir}" && ${sudo_cmd} bash rancher-load-images.sh \
-        -l "rke2-images-all.${arch_linux}.txt" -i "$(basename "${tarball}")" \
+        -l "${tmp_list}" -i "$(basename "${tarball}")" \
         -r "${registry}" ); then
       logger info "加载完成: $(basename "${tarball}")"
     else

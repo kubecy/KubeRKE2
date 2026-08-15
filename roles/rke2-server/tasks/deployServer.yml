@@ -20,6 +20,28 @@
 - name: 部署 RKE2 SERVER 程序
   shell: INSTALL_RKE2_TYPE=server INSTALL_RKE2_VERSION={{ rke2_version }} INSTALL_RKE2_ARTIFACT_PATH={{ global.software_dir }} sh {{ global.software_dir }}/install.sh
 
+- name: 校验 kube-vip 配置完整
+  fail:
+    msg: "global.kube_vip_version 已配置, 但 global.kube_vip, kube_vip_interface 缺失或非法, 请检查 site.yml"
+  when:
+    - global.kube_vip_version is defined and global.kube_vip_version | length > 0
+    - (global.kube_vip is not defined or global.kube_vip | length == 0
+       or global.kube_vip_interface is not defined or global.kube_vip_interface | length == 0
+       or global.kube_vip is not match '^[0-9]{1,3}(\.[0-9]{1,3}){3}$')
+
+- name: 创建 RKE2 Server manifests 目录
+  file:
+    path: "{{ global.rke2_data_dir }}/server/manifests"
+    state: directory
+    mode: '0755'
+  when: global.kube_vip_version is defined and global.kube_vip_version | length > 0
+
+- name: 部署 kube-vip 控制面 HA 清单
+  template:
+    src: kube-vip.yaml.j2
+    dest: "{{ global.rke2_data_dir }}/server/manifests/kube-vip.yaml"
+  when: global.kube_vip_version is defined and global.kube_vip_version | length > 0
+
 - name: 启动 RKE2 SERVER 初始化节点【首个 MASTER】
   systemd:
     name: rke2-server
@@ -45,6 +67,17 @@
   run_once: true
 #  delegate_to: localhost
 
+- name: 等待 kube-vip 在首个 MASTER 接管 VIP 地址
+  shell: ip -4 addr show | grep -qw "{{ global.kube_vip }}"
+  register: vip_check
+  until: vip_check.rc == 0
+  retries: 90
+  delay: 5
+  changed_when: false
+  delegate_to: "{{ first_master_node }}"
+  run_once: true
+  when: global.kube_vip_version is defined and global.kube_vip_version | length > 0
+
 - name: 检查是否安装 CNI 插件
   stat:
     path: /opt/cni
@@ -62,7 +95,7 @@
 
 - name: 启动额外的 RKE2 SERVER 服务
   systemd:
-    name: rke2_server
+    name: rke2-server
     state: restarted
     enabled: yes
   when: not init_master | default(false) | bool
