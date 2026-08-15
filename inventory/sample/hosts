@@ -16,3 +16,9 @@ cq-moone-worker1 ansible_host=192.168.1.71
 cq-moone-worker2 ansible_host=192.168.1.72
 cq-moone-worker3 ansible_host=192.168.1.73
 cq-moone-worker4 ansible_host=192.168.1.74
+
+## 配置 VIP 
+[rke2_lb]
+cq-moone-lb1 ansible_host=192.168.1.16
+cq-moone-lb2 ansible_host=192.168.1.17 
+
