@@ -1,5 +1,12 @@
+# Rke2Ops
 <!-- Logo -->
 <img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Rke2Ops-logo.png?raw=true" width="220px" alt="Rke2Ops logo"/>
+
+<!-- Badges -->
+<a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-informational?logo=kubernetes&logoColor=white&color=326ce5" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Framework-Ansible-red?logo=ansible&logoColor=white" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Environment-Multi--env-yellow?logo=gnu&color=yellow" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Shell-Bash-green?logo=gnubash&logoColor=white" /></a>
 # Rke2Ops — RKE2 离线交付与自动化部署平台
 
 基于 Ansible + `rke2ctl` 的 RKE2 Kubernetes 生产级交付工具链：**离线资源下载 → 内网镜像导入 → 一键部署 → 健康验证**全流程自动化，内置 kube-vip 控制面 HA，无需外部 LB。
