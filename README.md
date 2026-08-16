@@ -24,7 +24,10 @@
 
 
 ### 1.1 拓扑
-https://github.com/kubecy/Rke2Ops/blob/main/pics/kube-vip-RKE2-.png
+<p align="center">
+<img src="./pics/architecture-rke2-vip.png" width="800" alt="Rke2Ops Kube‑VIP高可用部署架构图">
+</p>
+
 
 ```mermaid
 flowchart LR
