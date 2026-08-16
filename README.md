@@ -4,7 +4,7 @@
 <!-- Rke2Ops 完整版徽章 -->
 <a href="#"><img src="https://img.shields.io/badge/Project-Rke2Ops-326ce5?logo=kubernetes&logoColor=white" /></a>
 <a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-326ce5?logo=kubernetes&logoColor=white" /></a>
-<a href="#"><img src="https://img.shields.io/badge/Support‑OS-Rocky%7COpenEuler%7CKylin%7CUbuntu-yellow" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Support‑OS-Rocky%7COpenEuler%7CKylin%7CDebian-yellow" /></a>
 
 # Rke2Ops — RKE2 离线交付与自动化部署平台
 
