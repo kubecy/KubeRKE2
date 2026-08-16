@@ -21,7 +21,7 @@
 
 ## 1. 架构与主机规划
 ### 1.1 拓扑
-<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/ Kube-VIP-RKE2.png">
+<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2-.png">
 
 
 ```mermaid
