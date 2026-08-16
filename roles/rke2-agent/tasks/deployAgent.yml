@@ -11,6 +11,18 @@
     state: restarted
     enabled: yes
 
+#- name: 检查是否安装 CNI 插件
+#  stat:
+#    path: /opt/cni
+#  register: cni_dir
+#
+#- name: 修改 /opt/cni 权限
+#  file:
+#    path: /opt/cni
+#    owner: root
+#    group: root
+#    recurse: true
+
 - name: 检查是否安装 CNI 插件
   stat:
     path: /opt/cni
@@ -22,3 +34,5 @@
     owner: root
     group: root
     recurse: true
+  when: cni_dir.stat.exists
+

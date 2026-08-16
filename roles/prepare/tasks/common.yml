@@ -71,6 +71,140 @@
   copy: src=sctp.conf dest=/etc/modprobe.d/sctp.conf
 
 ####################################################################################
+## 磁盘分区与挂载 (global.partition: yes 时生效)                                  ###
+####################################################################################
+- name: "磁盘分区与挂载 (global.partition: yes 时生效)"
+  block:
+    - name: 安装文件系统与 LVM 工具 (xfsprogs, lvm2)
+      package:
+        name:
+          - xfsprogs
+          - lvm2
+        state: present
+
+    - name: 组装磁盘挂载配置 (按 global.*_disk 用户定义)
+      set_fact:
+        disk_mount_configs: "{{ disk_mount_configs | default([]) + [item] }}"
+      loop:
+        - device: "/dev/{{ global.partition.rke2_data_dir_disk | default('') }}"
+          mount: "{{ global.rke2_data_dir }}"
+          vg: vg_rke2
+          lv: lv_rke2
+        - device: "/dev/{{ global.partition.kubelet_dir_disk | default('') }}"
+          mount: "{{ global.kubelet_dir }}"
+          vg: vg_kubelet
+          lv: lv_kubelet
+        - device: "/dev/{{ global.partition.etcd_dir_disk | default('') }}"
+          mount: "{{ global.rke2_data_dir }}/server/db/etcd"
+          vg: vg_etcd
+          lv: lv_etcd
+          server_only: true                     ## etcd 仅 rke2-server (master) 节点挂载
+      when:
+        - item.device not in ['/dev/']
+        - item.device != '/dev/none'
+        - not (item.server_only | default(false) and 'rke2_server' not in group_names)
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 检测用户定义挂载盘是否存在
+      stat:
+        path: "{{ item.device }}"
+      register: disk_check
+      loop: "{{ disk_mount_configs }}"
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 校验用户定义挂载盘存在
+      fail:
+        msg: "主机 {{ inventory_hostname }} 未检测到磁盘 {{ item.item.device }}, 请检查硬件或在 site.yml 中修改 global.partition.rke2_data_dir_disk / kubelet_dir_disk / etcd_dir_disk"
+      loop: "{{ disk_check.results }}"
+      when: not item.stat.exists
+      loop_control:
+        label: "{{ item.item.device }}"
+
+    - name: 计算各磁盘当前挂载状态
+      set_fact:
+        disk_mount_status: "{{ disk_mount_status | default({}) | combine({item.device: (ansible_mounts | selectattr('device', 'match', '^' ~ item.device ~ '(p?[0-9]+)?$') | map(attribute='mount') | list)}) }}"
+      loop: "{{ disk_mount_configs }}"
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 校验磁盘未被挂载到其他目录
+      fail:
+        msg: "主机 {{ inventory_hostname }} 磁盘 {{ item.device }} 已挂载到 {{ disk_mount_status[item.device] | join(',') }}, 与目标挂载点 {{ item.mount }} 不符, 拒绝格式化, 请手动处理"
+      loop: "{{ disk_mount_configs }}"
+      when:
+        - disk_mount_status[item.device] | length > 0
+        - item.mount not in disk_mount_status[item.device]
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 创建挂载点目录
+      file:
+        path: "{{ item.mount }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ disk_mount_configs }}"
+      loop_control:
+        label: "{{ item.mount }}"
+
+    - name: 创建物理卷与卷组 (LVM, 整盘直接使用)
+      lvg:
+        vg: "{{ item.vg }}"
+        pvs: "{{ item.device }}"
+      loop: "{{ disk_mount_configs }}"
+      when: disk_mount_status[item.device] | length == 0
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 创建逻辑卷
+      lvol:
+        vg: "{{ item.vg }}"
+        lv: "{{ item.lv }}"
+        size: 100%FREE
+      loop: "{{ disk_mount_configs }}"
+      when: disk_mount_status[item.device] | length == 0
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 格式化逻辑卷为 {{ global.partition.format_type | default('xfs') }}
+      filesystem:
+        fstype: "{{ global.partition.format_type | default('xfs') }}"
+        dev: "/dev/{{ item.vg }}/{{ item.lv }}"
+      loop: "{{ disk_mount_configs }}"
+      when: disk_mount_status[item.device] | length == 0
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 获取逻辑卷 UUID
+      shell: "blkid -s UUID -o value /dev/{{ item.vg }}/{{ item.lv }}"
+      register: disk_part_uuid
+      loop: "{{ disk_mount_configs }}"
+      when: disk_mount_status[item.device] | length == 0
+      loop_control:
+        label: "{{ item.device }}"
+
+    - name: 分区 UUID 映射
+      set_fact:
+        disk_part_uuid_map: "{{ disk_part_uuid_map | default({}) | combine({item.item.device: item.stdout}) }}"
+      loop: "{{ disk_part_uuid.results }}"
+      loop_control:
+        label: "{{ item.item.device }}"
+
+    - name: 挂载到目标目录并写入 fstab
+      mount:
+        path: "{{ item.mount }}"
+        src: "UUID={{ disk_part_uuid_map[item.device] }}"
+        fstype: "{{ global.partition.format_type | default('xfs') }}"
+        state: mounted
+        backup: yes
+      loop: "{{ disk_mount_configs }}"
+      when: disk_mount_status[item.device] | length == 0
+      loop_control:
+        label: "{{ item.device }}"
+  when: global.partition.enabled | default("no") | bool
+
+####################################################################################
 ## RKE2 基础配置信息                                                             ###
 ####################################################################################
 - name: 创建 {{ global.k8s_user.group }} 组
@@ -142,12 +276,6 @@
   fail:
     msg: "缺少 {{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/ 下 {{ arch }} 架构的 rke2.linux-{{ rke2_arch_suffix }}.tar.gz, 请先执行 ./rke2ctl download {{ env_dir | basename }}"
   when: not rke2_arch_pkg.stat.exists
-
-#- name: 同步 RKE2 二进制包, 镜像清单文件, 校验文件, 安装脚本
-#  copy:
-#    src: "{{ global.ansible_dir }}/{{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/"
-#    dest: "{{ global.software_dir }}"
-#    mode: preserve
 
 - name: 同步 RKE2 安装脚本, 二进制包, 镜像清单文件, 校验文件
   copy:

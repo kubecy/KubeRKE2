@@ -89,9 +89,7 @@
     owner: root
     group: root
     recurse: true
-  when:
-    - init_master | default(false) | bool
-    - cni_dir.stat.exists
+  when: cni_dir.stat.exists
 
 - name: 启动额外的 RKE2 SERVER 服务
   systemd:
@@ -99,18 +97,3 @@
     state: restarted
     enabled: yes
   when: not init_master | default(false) | bool
-
-- name: 检查是否安装 CNI 插件
-  stat:
-    path: /opt/cni
-  register: cni_dir
-
-- name: 修改 /opt/cni 权限
-  file:
-    path: /opt/cni
-    owner: root
-    group: root
-    recurse: true
-  when:
-    - not init_master | default(false) | bool
-    - cni_dir.stat.exists

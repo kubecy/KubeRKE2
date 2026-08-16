@@ -29,6 +29,12 @@ global:
   kube_vip_version: "v1.2.3"                   ## 镜像版本 KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
   kube_vip_interface: "ens160"                 ## 接口
   kube_vip: "192.168.1.110"                    ## VIP
+  partition:                                   ## yes：rke2-server、rke2-agent主机磁盘分区, no: 不分区 (no 时以下子键均不生效)
+    enabled: "yes"                             ## 分区开关
+    rke2_data_dir_disk: "nvme0n2"              ## rke2_data_dir 挂载盘 (nvme0n2 或 sdb, 按用户环境定义)
+    kubelet_dir_disk: "nvme0n3"                ## kubelet_dir 挂载盘 (nvme0n3 或 sdc, 按用户环境定义)
+    etcd_dir_disk: "none"                      ## 如果none，则etcd目录不单独挂载。
+    format_type: "xfs"                         ## 分区文件系统类型 (xfs/ext4)
 
 
 ##============================================================================= 
