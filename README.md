@@ -22,7 +22,9 @@
 
 ## 1. 架构与主机规划
 
+
 ### 1.1 拓扑
+https://github.com/kubecy/Rke2Ops/blob/main/pics/kube-vip-RKE2-.png
 
 ```mermaid
 flowchart LR
