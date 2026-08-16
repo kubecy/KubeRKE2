@@ -1,6 +1,6 @@
 # Rke2Ops
 <!-- Logo -->
-<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Rke2Ops.png?raw=true" width="220px" alt="Rke2Ops logo"/>
+<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Rke2Ops-logo.png?raw=true" width="220px" alt="Rke2Ops logo"/>
 
 <!-- Badges -->
 <a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-informational?logo=kubernetes&logoColor=white&color=326ce5" /></a>
