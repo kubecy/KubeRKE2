@@ -1,15 +1,10 @@
 # Rke2Ops
 <!-- Logo -->
 <img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Rke2Ops.png?raw=true" width="220px" alt="Rke2Ops logo"/>
-
 <!-- Rke2Ops 完整版徽章 -->
 <a href="#"><img src="https://img.shields.io/badge/Project-Rke2Ops-326ce5?logo=kubernetes&logoColor=white" /></a>
-<a href="#"><img src="https://img.shields.io/badge/RKE2-v1.36+-blue" /></a>
-<a href="#"><img src="https://img.shields.io/badge/Ansible-2.15+-red?logo=ansible&logoColor=white" /></a>
 <a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-326ce5?logo=kubernetes&logoColor=white" /></a>
 <a href="#"><img src="https://img.shields.io/badge/Support‑OS-CentOS%7COpenEuler%7CKylin%7CUbuntu-yellow" /></a>
-<a href="#"><img src="https://img.shields.io/badge/License-Apache%202.0-green" /></a>
-<a href="https://github.com/kubecy/Rke2Ops/stargazers"><img src="https://img.shields.io/github/stars/kubecy/Rke2Ops" /></a>
 
 # Rke2Ops — RKE2 离线交付与自动化部署平台
 
