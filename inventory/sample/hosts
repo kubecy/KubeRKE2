@@ -16,4 +16,6 @@ cq-moone-worker1 ansible_host=192.168.1.71
 cq-moone-worker2 ansible_host=192.168.1.72
 cq-moone-worker3 ansible_host=192.168.1.73
 cq-moone-worker4 ansible_host=192.168.1.74
+cq-moone-worker5 ansible_host=192.168.1.75
+cq-moone-worker6 ansible_host=192.168.1.76
 
