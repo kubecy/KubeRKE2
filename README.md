@@ -24,9 +24,7 @@
 
 
 ### 1.1 拓扑
-<p align="center">
-<img src="./pics/architecture-rke2-vip.png" width="800" alt="Rke2Ops Kube‑VIP高可用部署架构图">
-</p>
+![Rke2Ops Kube‑VIP高可用部署架构图](./pics/architecture-rke2-vip.png)
 
 
 ```mermaid
