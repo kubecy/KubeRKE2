@@ -2,11 +2,15 @@
 <!-- Logo -->
 <img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Rke2Ops.png?raw=true" width="220px" alt="Rke2Ops logo"/>
 
-<!-- Badges -->
-<a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-informational?logo=kubernetes&logoColor=white&color=326ce5" /></a>
-<a href="#"><img src="https://img.shields.io/badge/Framework-Ansible-red?logo=ansible&logoColor=white" /></a>
-<a href="#"><img src="https://img.shields.io/badge/Environment-Multi--env-yellow?logo=gnu&color=yellow" /></a>
-<a href="#"><img src="https://img.shields.io/badge/Shell-Bash-green?logo=gnubash&logoColor=white" /></a>
+<!-- Rke2Ops 完整版徽章 -->
+<a href="#"><img src="https://img.shields.io/badge/Project-Rke2Ops-326ce5?logo=kubernetes&logoColor=white" /></a>
+<a href="#"><img src="https://img.shields.io/badge/RKE2-v1.36+-blue" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Ansible-2.15+-red?logo=ansible&logoColor=white" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-326ce5?logo=kubernetes&logoColor=white" /></a>
+<a href="#"><img src="https://img.shields.io/badge/Support‑OS-CentOS%7COpenEuler%7CKylin%7CUbuntu-yellow" /></a>
+<a href="#"><img src="https://img.shields.io/badge/License-Apache%202.0-green" /></a>
+<a href="https://github.com/kubecy/Rke2Ops/stargazers"><img src="https://img.shields.io/github/stars/kubecy/Rke2Ops" /></a>
+
 # Rke2Ops — RKE2 离线交付与自动化部署平台
 
 基于 Ansible + `rke2ctl` 的 RKE2 Kubernetes 生产级交付工具链：**离线资源下载 → 内网镜像导入 → 一键部署 → 健康验证**全流程自动化，内置 kube-vip 控制面 HA，无需外部 LB。
