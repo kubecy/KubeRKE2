@@ -52,7 +52,7 @@ Rke2Ops/
                                                ├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包 (按 cni 配置下载)
                                                └── kube-vip-image-v1.2.3.tar.gz           # kube-vip 镜像包
 
-# 修改需要部署版本和 rke2 参数
+# 修改需要下载的 rke2 版本和参数
 yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
 
 # 下载 rke2 离线镜像包
@@ -117,98 +117,6 @@ yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
 
 # 一键部署
 yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
-```
-
-
-
-
-
-
-
-
-
-
-
-
----
-
-
-
-
-
-
-
-
-
----
-
-## 6. 部署
-
-### 6.1 创建环境（首次）
-
-```shell
-./rke2ctl new cq-moone-k45        # 复制 sample 模板 + 加密 secrets.yml + 建 packages_rke2 目录
-./rke2ctl list                    # 查看全部环境
-```
-
-### 6.2 配置三件套
-
-**① hosts — 主机清单**（`inventory/<环境名>/hosts`）：
-
-```ini
-
-```
-
-**② site.yml — 环境变量**（关键项）：
-
-| 配置项 | 说明 |
-| ------ | ---- |
-| `rke2_version` / `arch` | 安装包版本与架构，download 依赖 |
-| `ssh_user` | SSH 远程用户（节点需提前创建并授权 sudo） |
-| `global.token` | 集群共享 token，master/worker 一致 |
-| `global.docker_repo.*` | Harbor 地址 / 账号 / 密码，pull 与节点拉取依赖 |
-| `global.kube_vip*` | VIP 三段配置（见 1.3） |
-| `rke2_server.tls_san[0]` | 必须为 `{{ global.kube_vip }}`（HA_VIP，第一行） |
-| `rke2_server.cni` | 网络插件：none / calico / canal / cilium（download 按此下载镜像包） |
-
-> 配置了 `global.kube_vip_version` 但缺少 `kube_vip` / `kube_vip_interface` 时，playbook 会**校验失败**并给出提示，防止错配。
-
-**③ secrets.yml — sudo 密码**（vault 加密，键名必须与 hosts 主机名完全一致）：
-
-```shell
-ansible-vault edit inventory/cq-moone-k45/secrets.yml
-echo "你的sudo密码" | base64        # 密码需 base64 编码填入
-```
-
-```yaml
-servers:
-  cq-moone-master1:
-    sudopass: "xxxbase64xxx"
-```
-
-### 6.3 分发 SSH 公钥
-
-```shell
-./rke2ctl setup cq-moone-k45 ssh-copy     # sshpass 自动解析 hosts/site.yml 并分发
-```
-
-### 6.4 （推荐）
-
-```shell
-./rke2ctl setup cq-moone-k45 all
-```
-
-内部按序执行 `playbooks/rke2-server.yml` → `playbooks/rke2-agent.yml`，**任一步失败立即停止**并返回可读退出码（1=执行错误 2=主机不可达 3=解析错误 99=中断）。
-
-分步部署（等价命令，需在仓库根目录、`env_dir` 传**绝对路径**）：
-
-```shell
-./rke2ctl setup cq-moone-k45 rke2-server
-./rke2ctl setup cq-moone-k45 rke2-agent
-
-# 或直接调 ansible-playbook:
-ansible-playbook -i inventory/cq-moone-k45/hosts --ask-vault-pass \
-    -e env_dir=$PWD/inventory/cq-moone-k45 playbooks/rke2-server.yml
 ```
 
 ### 6.5 部署机制（HA 关键路径）
