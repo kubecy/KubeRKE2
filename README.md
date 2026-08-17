@@ -155,5 +155,4 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 # 参考
 
 - [RKE2 官方文档](https://docs.rke2.io/)
-- [kube-vip 项目](https://kube-vip.io/)
-- [rancher-load-images.sh](https://github.com/rancher/rancher/releases)
+- [kube-vip](https://kube-vip.io/)
