@@ -123,7 +123,7 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 
 ---
 
-# 常见问题（FAQ）
+# 常见问题
 
 | 现象 | 原因 | 处理 |
 | ---- | ---- | ---- |
