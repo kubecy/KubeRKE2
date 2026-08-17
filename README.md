@@ -13,7 +13,24 @@ Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。
 # 开始开始
 ```
 yichen@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
+yichen@Ubuntu-Desktop:~$ cd Rke2Ops/
 
+## 配置 Tab
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl bash-completion
+
+## 创建部署环境
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl new cq-moone
+2026-08-17 12:34:59 [rke2ctl:220] INFO  已创建环境 cq-moone: /home/yichen/Rke2Ops/inventory/cq-moone
+2026-08-17 12:34:59 [rke2ctl:222] INFO  正在加密 /home/yichen/Rke2Ops/inventory/cq-moone/secrets.yml (请输入两遍 vault 密码)
+New Vault password:           ## 输入secrets.yml文件解密密码
+Confirm New Vault password:   ## 确定secrets.yml文件解密密码
+Encryption successful
+
+## 修改部署版本和rke2参数
+yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
+
+## 下载 rke2离线镜像包
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
 ```
 
 ### 1.1 拓扑
