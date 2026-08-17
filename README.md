@@ -119,10 +119,6 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
 admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 ```
 
-
-
----
-
 # 常见问题
 
 | 现象 | 原因 | 处理 |
@@ -135,7 +131,6 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 | download 下载慢/失败 | GitHub 直连受限 | 配置 `download_proxy` 多个加速镜像，空格分隔依次重试 |
 | 修改 `tls_san` 后证书不生效 | 证书 SAN 未刷新 | 修改后需重启全部 server 节点，动态监听器会重建证书 |
 
----
 
 # rke2ctl 命令速查
 
@@ -149,8 +144,6 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 | `rke2ctl pull <环境名> [registry]` | 镜像导入私有仓库（内网） |
 | `rke2ctl setup <环境名> <all\|ssh-copy\|rke2-server\|rke2-agent>` | 分发公钥 / 部署 master / 部署 worker / 全量部署 |
 | `rke2ctl bash-completion` | 启用 tab 补全 |
-
----
 
 # 参考
 
