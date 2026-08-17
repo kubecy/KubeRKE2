@@ -119,72 +119,11 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
 admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 ```
 
-### 6.5 部署机制（HA 关键路径）
 
-```
-master1 (init_master=true):  安装 RKE2 → 写入 kube-vip 清单至
-                             /var/lib/rancher/rke2/server/manifests/
-                             → 启动后 k3s deploy controller 自动 apply
-                             → kube-vip 抢占 VIP (等待任务, 上限 7.5 分钟)
-master2/3:                   server: https://<VIP>:9345 加入集群
-worker:                      server: https://<VIP>:9345 加入集群
-```
-
-- 所有节点从 Harbor 拉取镜像（`system-default-registry` + `disable-default-registry-endpoint`）
-- master 注册时带 `node-role.kubernetes.io/control-plane=true:NoSchedule` 污点，kube-vip DaemonSet 通过 toleration 调度
-- 查看节点日志：`journalctl -u rke2-server -f` / `journalctl -u rke2-agent -f`
-
-### 6.6 tab 补全（可选）
-
-```shell
-./rke2ctl bash-completion     # 安装后重开 shell, 环境名/部署类型均可 tab 补全
-```
 
 ---
 
-## 7. 部署验证
-
-在 Ansible 主机上（`export KUBECONFIG=/etc/rancher/rke2/rke2.yaml`，或 `scp` 回本地）：
-
-### 7.1 节点与组件
-
-```shell
-kubectl get nodes -o wide                    # 全部 Ready; master 带 control-plane 角色
-kubectl get pods -n kube-system -o wide      # coredns/etcd/kube-vip-ds 均 Running
-kubectl get ds -n kube-system kube-vip-ds    # DESIRED = master 数, 仅 control-plane 节点
-```
-
-### 7.2 VIP 接管
-
-```shell
-# 在任一 master 上执行 (仅持有 VIP 的 Leader 节点可见):
-ip -4 addr show | grep 192.168.1.110
-# 或查看 kube-vip 日志确认选主结果:
-kubectl logs -n kube-system -l app.kubernetes.io/name=kube-vip-ds | grep -i leader
-```
-
-### 7.3 控制面 API 可达
-
-```shell
-curl -k https://192.168.1.110:6443/version     # 返回 k8s 版本 JSON 即 HA 生效
-curl -k -sS -o /dev/null -w '%{http_code}\n' https://192.168.1.110:9345
-# 注册端口返回非 000 状态码 (401/404 属正常) 即由 kube-vip 承载
-```
-
-### 7.4 故障转移演练
-
-```shell
-# 在持有 VIP 的 master 上:
-systemctl stop rke2-server
-# 观察 (租约 15s, 可到另台 master 执行):
-ip -4 addr show | grep 192.168.1.110           # VIP 已漂移至此节点
-curl -k https://192.168.1.110:6443/version     # 集群 API 持续可用
-# 恢复: systemctl start rke2-server, kube-vip 自动重新加入选主
-```
-
----
-
-## 8. 常见问题（FAQ）
+# 常见问题（FAQ）
 
 | 现象 | 原因 | 处理 |
 | ---- | ---- | ---- |
@@ -198,7 +137,7 @@ curl -k https://192.168.1.110:6443/version     # 集群 API 持续可用
 
 ---
 
-## 9. rke2ctl 命令速查
+# rke2ctl 命令速查
 
 | 命令 | 说明 |
 | ---- | ---- |
@@ -213,7 +152,7 @@ curl -k https://192.168.1.110:6443/version     # 集群 API 持续可用
 
 ---
 
-## 10. 参考
+# 参考
 
 - [RKE2 官方文档](https://docs.rke2.io/)
 - [kube-vip 项目](https://kube-vip.io/)
