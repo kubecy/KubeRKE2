@@ -7,47 +7,12 @@
 <a href="#"><img src="https://img.shields.io/badge/Support‑OS-RedHat%7CRocky%7COpenEuler%7CKylin%7CDebian%7CUbuntu-yellow" /></a>
 
 **Rke2Ops** 是一款面向 RKE2 多环境、多版本自动化部署运维工具。内置 kube‑vip 一体化方案，零外部负载均衡依赖，一键构建稳定可靠的 Kubernetes 控制平面高可用集群，大幅简化裸金属、离线机房 Kubernetes 高可用落地流程。
-
-## 特性
-
-- **全离线交付**：外网一次下载全部安装包与镜像（含 kube-vip），内网环境零外网依赖
-- **kube-vip 控制面 HA**：VIP 由 DaemonSet 动态接管，故障自动漂移，替代 keepalived + haproxy，无需独立 LB 节点
-- **多环境隔离**：`inventory/<环境名>` 独立维护 hosts / site.yml / secrets.yml，互不影响
-- **一条命令**：`rke2ctl setup <环境> all` 顺序完成 rke2-server → rke2-agent 全量部署，支持 tab 补全
-- **镜像链路一致**：下载、推送、节点拉取全链路统一 `rancher/` 命名，私有仓库即拉即用
-
+<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2.png">
 ---
 
 ## 1. 架构与主机规划
 ### 1.1 拓扑
-<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2.png">
 
-
-```mermaid
-flowchart LR
-    subgraph 外网[外网跳板机]
-        DL[rke2ctl download<br/>GitHub / DaoCloud]
-    end
-    subgraph 内网[企业内网]
-        ANS[Ansible 主机<br/>rke2ctl / playbooks]
-        HAR[(Harbor<br/>harbor.kubecy.com)]
-        subgraph K8S[RKE2 集群]
-            M1[(master1)]
-            M2[(master2)]
-            M3[(master3)]
-            W1[(worker1)]
-            W2[(worker2)]
-        end
-        VIP[VIP 192.168.1.110<br/>kube-vip 接管]
-    end
-    DL -- 离线包拷贝 --> ANS
-    ANS -- pull 推送镜像 --> HAR
-    HAR -. 节点 containerd 拉取 .-> M1 & M2 & M3 & W1 & W2
-    Client[客户端] --> VIP
-    VIP <--> M1 & M2 & M3
-    M1 & M2 & M3 <-. kube-vip DaemonSet .-> VIP
-    ANS -- ansible-playbook --> M1 & M2 & M3 & W1 & W2
-```
 
 ### 1.2 主机规划
 
