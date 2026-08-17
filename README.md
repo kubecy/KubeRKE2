@@ -52,7 +52,7 @@ Rke2Ops/
                                                ├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包 (按 cni 配置下载)
                                                └── kube-vip-image-v1.2.3.tar.gz           # kube-vip 镜像包
 
-# 修改需要下载的 rke2 版本和参数
+# 修改需要下载的 rke2 版本
 admin@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
 
 # 下载 rke2 离线镜像包
