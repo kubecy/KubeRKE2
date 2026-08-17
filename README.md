@@ -11,7 +11,7 @@ Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。
 
 
 # 开始开始
-```
+``` bash
 yichen@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
 yichen@Ubuntu-Desktop:~$ cd Rke2Ops/
 
