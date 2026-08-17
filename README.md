@@ -9,212 +9,136 @@
 Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。内置 kube‑vip 一体化方案，零外部负载均衡依赖，一键构建稳定可靠的 Kubernetes 控制平面高可用集群，大幅简化裸金属、离线机房 Kubernetes 高可用落地流程。
 <img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2.png">
 
-
-# Quick Start
+---
+# 快速开始
 ``` bash
 yichen@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
 yichen@Ubuntu-Desktop:~$ cd Rke2Ops/
 
-## 配置 Tab
+# 配置 rke2ctl Tab 功能 
 yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl bash-completion
 
-## 创建部署环境
+# 创建部署环境
 yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl new cq-moone
 2026-08-17 12:34:59 [rke2ctl:220] INFO  已创建环境 cq-moone: /home/yichen/Rke2Ops/inventory/cq-moone
 2026-08-17 12:34:59 [rke2ctl:222] INFO  正在加密 /home/yichen/Rke2Ops/inventory/cq-moone/secrets.yml (请输入两遍 vault 密码)
-New Vault password:           ## 输入secrets.yml文件解密密码
-Confirm New Vault password:   ## 确定secrets.yml文件解密密码
+New Vault password:             # 输入secrets.yml文件解密密码
+Confirm New Vault password:     # 确定secrets.yml文件解密密码
 Encryption successful
 
-## 修改需要部署版本和 rke2 参数
-yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
-
-## 下载 rke2 离线镜像包
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
-
-## 打包拷贝离线环境
-```
-
-# Configuration
-``` bash
-## 上传镜像至 harbor 镜像仓库
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
-
-## 修改 hosts 和 密码加密文件
-yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.yml
-```
-
-# Installation
-``` bash
-## 分发公钥
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone ssh-copy
-
-## 部署 rke2-server
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-server
-
-## 部署rke2-agent
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
-```
-
-
-
-
-
-
-
-### 1.2 主机规划
-
-| 节点角色           | 主机名           | IP            | 数量 | 说明                                     |
-| ------------------ | ---------------- | ------------- | ---- | ---------------------------------------- |
-| 控制面 + etcd      | `<env>-masterN`  | 192.168.1.6x  | ≥1   | 组 `[rke2_server]`，有且仅有一台 `init_master=true` |
-| Worker             | `<env>-workerN`  | 192.168.1.7x  | ≥0   | 组 `[rke2_agent]`，可与 master 同时部署   |
-| Harbor 私有仓库    | `harbor.kubecy.com` | 192.168.1.150 | 1   | 需要预先创建 `rancher` 项目               |
-| Ansible 控制主机   | 跳板机 / 工作站  | -             | 1    | 持有本工程与离线包，执行 rke2ctl          |
-| VIP（HA 地址）     | -                | 192.168.1.110 | 1    | 由 kube-vip 在 master 间漂移，见 1.3      |
-
-规划要点：
-
-- master 建议 3 台（etcd 容错 ≥1）；worker 按业务规模扩容，`init_master=true` 必须且只能标记一台
-- 所有 master 需具备 root/sudo 能力；SSH 用户建议统一为 `admin`（`ssh_user` 可配置）
-- 节点需能访问 Harbor（`harbor.kubecy.com`），不需要任何公网出口
-
-### 1.3 VIP 规划（kube-vip 控制面 HA）
-
-kube-vip 以 DaemonSet 形式只部署在 **control-plane 节点**，通过 VRRP/ARP 抢占 VIP，Leader Election 持有者接管 VIP 与 9345/6443 流量；主节点故障时 VIP 自动漂移至存活 master（租约 15s）。
-
-| 配置项 | 值 | 说明 |
-| ------ | -- | ---- |
-| `global.kube_vip` | `192.168.1.110` | VIP 地址，必须与 master 同网段且**不在 DHCP 池内** |
-| `global.kube_vip_interface` | `ens160` | 与**所有 master 网卡名一致**（`ip -4 addr` 核对），不一致则无法绑定 |
-| `global.kube_vip_version` | `v1.2.3` | kube-vip 镜像版本，留空则不部署 kube-vip |
-
-> ⚠️ `rke2_server.tls_san[0]` 必须为 `{{ global.kube_vip }}`（证书 SAN 首项，且 master2/3、worker 均经 `https://VIP:9345` 加入集群）。
-
-### 1.4 工程目录结构
-
-```
+# 目录结构
 Rke2Ops/
-├── rke2ctl                     # 总控脚本: 环境/下载/推送/部署/补全
+├── rke2ctl                     # 总控脚本: 环境, 下载, 推送, 部署, 补全
 ├── playbooks/
-│   ├── rke2-server.yml         # 部署控制面 (master)
+│   ├── rke2-server.yml         # 部署 master
 │   └── rke2-agent.yml          # 部署 worker
 ├── roles/
-│   ├── prepare/                # 基础初始化 (用户/目录/离线包分发)
+│   ├── prepare/                # 基础初始化 (用户, 目录, 离线包分发)
 │   ├── rke2-server/            # 含 kube-vip.yaml.j2 (HA 清单)
 │   └── rke2-agent/
 ├── inventory/
 │   ├── sample/                 # 环境模板 (复制即得新环境)
-│   └── <环境名>/               # 独立环境: hosts / site.yml / secrets.yml
-└── packages_rke2/
-    └── <环境名>/<版本>/<架构>/ # 离线包 (download 产物, 含 kube-vip 镜像包)
+|   |   ├── hosts               # 配置 rke2-server 和 rke2-agent
+|   |   ├── secrets.yml         # 配置 sudo 密码
+|   |   ├── site.yml            # 配置 kre2 参数, 包括磁盘分区、网络插件等的启用, kube-vip 设置等文件
+│   └── <env>/                  # 独立环境: hosts / site.yml / secrets.yml
+└── packages_rke2/cq-moone/v1.36.3+rke2r1/amd64/                                          # 离线包 (download 产物, 含 kube-vip 镜像包)
+                                               ├── install.sh                             # RKE2 一键安装脚本
+                                               ├── rancher-load-images.sh                 # 镜像导入辅助脚本
+                                               ├── rke2.linux-amd64.tar.gz                # RKE2 核心程序包
+                                               ├── sha256sum-amd64.txt                    # 全部包 SHA256 校验值
+                                               ├── rke2-images-all.linux-amd64.txt        # 全量镜像清单
+                                               ├── rke2-images.linux-amd64.tar.gz         # 核心组件 + 默认 CNI 镜像
+                                               ├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包 (按 cni 配置下载)
+                                               └── kube-vip-image-v1.2.3.tar.gz           # kube-vip 镜像包
+
+# 修改需要部署版本和 rke2 参数
+yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
+
+# 下载 rke2 离线镜像包
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
+
+# 打包拷贝离线环境
+yichen@Ubuntu-Desktop:~/Rke2Ops$ tar -zcvf Rke2Ops.tar.gz ../Rke2Ops
 ```
+
+# 配置
+``` bash
+# 上传镜像至 harbor 镜像仓库
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
+
+# 修改 hosts 
+yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
+[rke2_server]
+cq-moone-master1 ansible_host=192.168.1.61 init_master=true
+cq-moone-master2 ansible_host=192.168.1.62
+cq-moone-master3 ansible_host=192.168.1.63
+
+[rke2_agent]
+cq-moone-worker1 ansible_host=192.168.1.71
+cq-moone-worker2 ansible_host=192.168.1.72
+cq-moone-worker3 ansible_host=192.168.1.73
+cq-moone-worker4 ansible_host=192.168.1.74
+cq-moone-worker5 ansible_host=192.168.1.75
+
+# 配置密码
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.yml
+---
+servers:
+  cq-moone-master1:
+    sudopass: "MTIzCg=="
+  cq-moone-master2:
+    sudopass: "MTIzCg=="
+  cq-moone-master3:
+    sudopass: "MTIzCg=="
+
+  cq-moone-worker1:
+    sudopass: "MTIzCg=="
+  cq-moone-worker2:
+    sudopass: "MTIzCg=="
+  cq-moone-worker3:
+    sudopass: "MTIzCg=="
+  cq-moone-worker4:
+    sudopass: "MTIzCg=="
+  cq-moone-worker5:
+    sudopass: "MTIzCg=="
+```
+
+# 部署
+``` bash
+# 分发公钥
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone ssh-copy
+
+# 部署 rke2-server
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-server
+
+# 部署rke2-agent
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
+
+# 一键部署
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
+```
+
+
+
+
+
+
+
+
+
+
+
 
 ---
 
-## 2. 总体流程（五步交付）
 
-```mermaid
-flowchart TD
-    A[① 离线下载 外网] --> B[② 拷贝 外网→内网]
-    B --> C[③ pull 镜像导入 Harbor 内网]
-    C --> D[④ 部署 环境配置 + setup]
-    D --> E[⑤ 验证 节点/VIP/故障转移]
-    A -->|rke2ctl download <环境>| A1[packages_rke2 产物 + kube-vip 包]
-    C -->|rke2ctl pull <环境>| C1[Harbor rancher 项目]
-    D -->|rke2ctl setup <环境> all| D1[master → worker 顺序部署]
-```
 
-| 步骤 | 执行位置 | 命令 | 产出 |
-| ---- | -------- | ---- | ---- |
-| ① 离线下载 | 外网机器（有 docker） | `rke2ctl download <环境>` | 安装包 + 镜像包 + kube-vip 包 |
-| ② 拷贝内网 | 外网 → 内网 | scp/rsync | 工程 + `packages_rke2/` |
-| ③ 导入镜像 | 内网（可访问 Harbor） | `rke2ctl pull <环境>` | Harbor 内全部镜像 |
-| ④ 部署 | Ansible 主机 | `rke2ctl setup <环境> all` | 集群就绪 |
-| ⑤ 验证 | Ansible 主机 | kubectl / curl | 节点、VIP、HA 均验证通过 |
 
----
 
-## 3. 离线下载（外网机器执行）
 
-在外网跳板机/笔记本上执行，自动读取该环境 `site.yml` 的 `rke2_version`、`arch`、`rke2_server.cni`、`global.kube_vip_version`，下载**全部所需文件**并按 `sha256sum` 校验：
 
-```shell
-./rke2ctl download cq-moone-k45
-```
 
-产物落盘 `packages_rke2/<环境名>/<版本>/<架构>/`：
-
-```
-packages_rke2/cq-moone-k45/v1.36.3+rke2r1/amd64/
-├── install.sh                       # RKE2 一键安装脚本
-├── rancher-load-images.sh           # 镜像导入辅助脚本
-├── rke2.linux-amd64.tar.gz          # RKE2 核心程序包
-├── sha256sum-amd64.txt              # 全部包 SHA256 校验值
-├── rke2-images-all.linux-amd64.txt  # 全量镜像清单
-├── rke2-images.linux-amd64.tar.gz   # 核心组件 + 默认 CNI 镜像
-├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包 (按 cni 配置下载)
-└── kube-vip-image-v1.2.3.tar.gz     # kube-vip 镜像包 (配置了 kube_vip_version 时)
-```
-
-要点：
-
-- **GitHub 加速**：`site.yml` 的 `download_proxy` 空格分隔多个加速前缀，依次尝试直至成功，留空则直连
-- **kube-vip 镜像**：经 DaoCloud GHCR 代理 `ghcr.m.daocloud.io/kube-vip/kube-vip:<版本>` 拉取，导出为 `rancher/kube-vip-kube-vip:<版本>` 并**幂等追加**到镜像清单，同时自动写入 `kube-vip-image-*.tar.gz` 离线包
-- **幂等**：已存在的文件自动跳过；清单追加不重复；校验失败会明确报错，修复后重跑同一命令即可
-
----
-
-## 4. 拷贝到内网环境
-
-将整个工程（含离线包）拷贝到内网 Ansible 主机：
-
-```shell
-# 外网机器上执行
-rsync -avzP Rke2Ops/ admin@<内网Ansible主机IP>:~/Rke2Ops/
-```
-
-> 建议整体拷贝：工程自带 `rke2ctl`、playbooks、inventory，后续全部步骤在 Ansible 主机上完成。
-> 若内网另有独立机器负责镜像导入（如 Harbor 服务器本身），至少需将 `packages_rke2/<环境名>/` 与 `rancher-load-images.sh` 拷贝过去。
-
----
-
-## 5. 镜像导入私有仓库（内网执行）
-
-前置条件：
-
-1. Harbor 已创建 **`rancher` 项目**（全部镜像推送至该项目下）
-2. 执行机器可访问 Harbor 且有 docker；`site.yml` 已配置 `global.docker_repo.host / user / password`
-
-执行：
-
-```shell
-./rke2ctl pull cq-moone-k45              # registry 缺省取 site.yml 的 global.docker_repo.host
-# 或指定其他仓库:
-./rke2ctl pull cq-moone-k45 registry.example.com
-```
-
-内部流程（对每个镜像包重复）：
-
-1. `sed` 去除镜像清单的 `docker.io/` 前缀（幂等）
-2. `docker login <registry>`（凭据来自 site.yml）
-3. `docker load` 导入镜像包，**按本地已加载镜像过滤清单**，避免 "No such image" 噪音
-4. `rancher-load-images.sh` 批量打 tag 并 push 至 `<registry>/rancher/*`
-
-完成后镜像落位：
-
-```
-harbor.kubecy.com/rancher/rancher-mirrored-*       # RKE2 核心/CNI 镜像
-harbor.kubecy.com/rancher/kube-vip-kube-vip:v1.2.3 # kube-vip 镜像
-```
-
-> ⚠️ kube-vip DaemonSet 使用**全限定路径** `{{ global.docker_repo.host }}/rancher/kube-vip-kube-vip:<版本>`，与 push 路径完全一致；RKE2 的 `system-default-registry` 不会改写用户 manifests 中的镜像，故必须保证该路径在 Harbor 中真实存在。
-
-验证（Harbor 机器或任一可访问节点）：
-
-```shell
-curl -u admin:<密码> https://harbor.kubecy.com/api/v2.0/projects/rancher/repositories?page_size=50
-```
 
 ---
 
@@ -232,14 +156,7 @@ curl -u admin:<密码> https://harbor.kubecy.com/api/v2.0/projects/rancher/repos
 **① hosts — 主机清单**（`inventory/<环境名>/hosts`）：
 
 ```ini
-[rke2_server]
-cq-moone-master1 ansible_host=192.168.1.61 init_master=true
-cq-moone-master2 ansible_host=192.168.1.62
-cq-moone-master3 ansible_host=192.168.1.63
 
-[rke2_agent]
-cq-moone-worker1 ansible_host=192.168.1.71
-cq-moone-worker2 ansible_host=192.168.1.72
 ```
 
 **② site.yml — 环境变量**（关键项）：
@@ -275,7 +192,7 @@ servers:
 ./rke2ctl setup cq-moone-k45 ssh-copy     # sshpass 自动解析 hosts/site.yml 并分发
 ```
 
-### 6.4 一键部署（推荐）
+### 6.4 （推荐）
 
 ```shell
 ./rke2ctl setup cq-moone-k45 all
