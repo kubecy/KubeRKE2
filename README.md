@@ -6,8 +6,7 @@
 <a href="#"><img src="https://img.shields.io/badge/Platform-Kubernetes-326ce5?logo=kubernetes&logoColor=white" /></a>
 <a href="#"><img src="https://img.shields.io/badge/Support‑OS-RedHat%7CRocky%7COpenEuler%7CKylin%7CDebian%7CUbuntu-yellow" /></a>
 
-# Rke2Ops — RKE2 离线交付与自动化部署平台
-基于 Ansible + `rke2ctl` 的 RKE2 Kubernetes 生产级交付工具链：**离线资源下载 → 内网镜像导入 → 一键部署 → 健康验证**全流程自动化，内置 kube-vip 控制面 HA，无需外部 LB。
+**Rke2Ops** 是一款面向 RKE2 多环境、多版本自动化部署运维工具。内置 kube‑vip 一体化方案，零外部负载均衡依赖，一键构建稳定可靠的 Kubernetes 控制平面高可用集群，大幅简化裸金属、离线机房 Kubernetes 高可用落地流程。
 
 ## 特性
 
