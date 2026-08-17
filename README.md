@@ -12,16 +12,16 @@ Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。
 ---
 # 快速开始
 ``` bash
-yichen@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
-yichen@Ubuntu-Desktop:~$ cd Rke2Ops/
+admin@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
+admin@Ubuntu-Desktop:~$ cd Rke2Ops/
 
 # 配置 rke2ctl Tab 功能 
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl bash-completion
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl bash-completion
 
 # 创建部署环境
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl new cq-moone
-2026-08-17 12:34:59 [rke2ctl:220] INFO  已创建环境 cq-moone: /home/yichen/Rke2Ops/inventory/cq-moone
-2026-08-17 12:34:59 [rke2ctl:222] INFO  正在加密 /home/yichen/Rke2Ops/inventory/cq-moone/secrets.yml (请输入两遍 vault 密码)
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl new cq-moone
+2026-08-17 12:34:59 [rke2ctl:220] INFO  已创建环境 cq-moone: /home/admin/Rke2Ops/inventory/cq-moone
+2026-08-17 12:34:59 [rke2ctl:222] INFO  正在加密 /home/admin/Rke2Ops/inventory/cq-moone/secrets.yml (请输入两遍 vault 密码)
 New Vault password:             # 输入secrets.yml文件解密密码
 Confirm New Vault password:     # 确定secrets.yml文件解密密码
 Encryption successful
@@ -53,22 +53,22 @@ Rke2Ops/
                                                └── kube-vip-image-v1.2.3.tar.gz           # kube-vip 镜像包
 
 # 修改需要下载的 rke2 版本和参数
-yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
+admin@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
 
 # 下载 rke2 离线镜像包
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
 
 # 打包拷贝离线环境
-yichen@Ubuntu-Desktop:~/Rke2Ops$ tar -zcvf Rke2Ops.tar.gz ../Rke2Ops
+admin@Ubuntu-Desktop:~/Rke2Ops$ tar -zcvf Rke2Ops.tar.gz ../Rke2Ops
 ```
 
 # 配置
 ``` bash
 # 上传镜像至 harbor 镜像仓库
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
 
 # 修改 hosts 
-yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
+admin@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
 [rke2_server]
 cq-moone-master1 ansible_host=192.168.1.61 init_master=true
 cq-moone-master2 ansible_host=192.168.1.62
@@ -82,7 +82,7 @@ cq-moone-worker4 ansible_host=192.168.1.74
 cq-moone-worker5 ansible_host=192.168.1.75
 
 # 配置密码
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.yml
+admin@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.yml
 ---
 servers:
   cq-moone-master1:
@@ -107,16 +107,16 @@ servers:
 # 部署
 ``` bash
 # 分发公钥
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone ssh-copy
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone ssh-copy
 
 # 部署 rke2-server
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-server
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-server
 
 # 部署rke2-agent
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
 
 # 一键部署
-yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 ```
 
 ### 6.5 部署机制（HA 关键路径）
