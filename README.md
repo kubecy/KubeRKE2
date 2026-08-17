@@ -10,7 +10,7 @@ Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。
 <img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2.png">
 
 
-# 开始开始
+# Quick Start
 ``` bash
 yichen@Ubuntu-Desktop:~$ git clone https://github.com/kubecy/Rke2Ops.git
 yichen@Ubuntu-Desktop:~$ cd Rke2Ops/
@@ -26,14 +26,41 @@ New Vault password:           ## 输入secrets.yml文件解密密码
 Confirm New Vault password:   ## 确定secrets.yml文件解密密码
 Encryption successful
 
-## 修改部署版本和rke2参数
+## 修改需要部署版本和 rke2 参数
 yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/site.yml
 
-## 下载 rke2离线镜像包
+## 下载 rke2 离线镜像包
 yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl download cq-moone
+
+## 打包拷贝离线环境
 ```
 
-### 1.1 拓扑
+# Configuration
+``` bash
+## 上传镜像至 harbor 镜像仓库
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
+
+## 修改 hosts 和 密码加密文件
+yichen@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.yml
+```
+
+# Installation
+``` bash
+## 分发公钥
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone ssh-copy
+
+## 部署 rke2-server
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-server
+
+## 部署rke2-agent
+yichen@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone rke2-agent
+```
+
+
+
+
+
 
 
 ### 1.2 主机规划
