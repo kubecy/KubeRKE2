@@ -38,10 +38,10 @@ Rke2Ops/
 │   └── rke2-agent/
 ├── inventory/
 │   ├── sample/                 # 环境模板 (复制即得新环境)
-│   |   ├── hosts               # 配置 rke2-server 和 rke2-agent
-│   |   ├── secrets.yml         # 配置 sudo 密码
-│   |   ├── site.yml            # 配置 kre2 参数, 包括磁盘分区、网络插件等的启用, kube-vip 设置等文件
-│   └── <env>/                  # 独立环境: hosts / site.yml / secrets.yml
+│   │   ├── hosts               # 配置 rke2-server 和 rke2-agent
+│   │   ├── secrets.yml         # 配置 sudo 密码
+│   │   ├── site.yml            # 配置 kre2 参数, 包括磁盘分区、网络插件等的启用, kube-vip 设置等文件
+│   └── env/                    # 独立环境: hosts / site.yml / secrets.yml
 └── packages_rke2/cq-moone/v1.36.3+rke2r1/amd64/                                          # 离线包 (download 产物, 含 kube-vip 镜像包)
                                                ├── install.sh                             # RKE2 一键安装脚本
                                                ├── rancher-load-images.sh                 # 镜像导入辅助脚本
