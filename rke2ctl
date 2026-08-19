@@ -165,9 +165,10 @@ usage() {
   ./rke2ctl list                                             列出全部环境 (sample 除外)
   ./rke2ctl new   <环境名>                                   创建新部署环境, 自动加密 secrets 并建 packages_rke2 目录
   ./rke2ctl del   <环境名>                                   删除部署环境 (inventory/ 与 packages_rke2/ 下同名目录)
-  ./rke2ctl setup <环境名> <all|ssh-copy|rke2-server|rke2-agent> 发 SSH 公钥和部署 k8s-master、k8s-worker, all 为先部署 rke2-server 再部署 rke2-agent
-  ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>/, rke2_version/arch/cni 均读环境 site.yml, 配置了 global.kube_vip_version 时一并导出 kube-vip 镜像包并追加镜像清单
-  ./rke2ctl pull <环境名> [registry]                         离线镜像一键导入私有仓库: 去 docker.io/ 前缀、docker login、加载全部 rke2-images*.tar.gz 及 kube-vip-image*.tar.gz, registry 缺省取 site.yml global.docker_repo.host
+  ./rke2ctl setup <环境名> ssh-copy                          发 SSH 公钥 
+  ./rke2ctl setup <环境名> <|rke2-server|rke2-agent|all>     部署 k8s-master、k8s-worker, all 为先部署 rke2-server 再部署 rke2-agent
+  ./rke2ctl download <环境名>                                离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>
+  ./rke2ctl push <环境名> [registry]                         离线镜像一键导入私有仓库
 
 示例:
   ./rke2ctl new cq-moone-k45                                 创建部署环境
@@ -494,14 +495,14 @@ _rke2ctl() {
   cur="${COMP_WORDS[COMP_CWORD]}"
 
   if [[ "${COMP_CWORD}" -eq 1 ]]; then
-    mapfile -t COMPREPLY < <(compgen -W "new del list setup download pull help bash-completion" -- "${cur}")
+    mapfile -t COMPREPLY < <(compgen -W "new del list setup download push help bash-completion" -- "${cur}")
     return 0
   fi
 
   case "${COMP_WORDS[1]}" in
     new)
       ;;
-    del|download|pull|setup)
+    del|download|push|setup)
       if [[ "${COMP_CWORD}" -eq 2 ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$(_rke2ctl_envs)" -- "${cur}")
       elif [[ "${COMP_WORDS[1]}" == "setup" && "${COMP_CWORD}" -eq 3 ]]; then
@@ -690,9 +691,9 @@ cmd_download() {
   fi
 }
 
-cmd_pull() {
+cmd_push() {
   if [[ $# -lt 1 || $# -gt 2 ]]; then
-    logger error "pull 需要 1-2 个参数: 环境名 [registry]"
+    logger error "push 需要 1-2 个参数: 环境名 [registry]"
     usage >&2
     exit 2
   fi
@@ -717,7 +718,7 @@ cmd_pull() {
   local registry="${registry_override:-${repo_host}}"
   if [[ -z "${registry}" ]]; then
     logger error "site.yml 未配置 global.docker_repo.host, 请手动指定:"\
-      "./rke2ctl pull ${env_name} <registry>"
+      "./rke2ctl push ${env_name} <registry>"
     exit 2
   fi
   [[ -n "${repo_user}" ]] || {
@@ -816,7 +817,7 @@ main() {
     list)         shift; cmd_list "$@" ;;
     setup)        shift; cmd_setup "$@" ;;
     d|download)   shift; cmd_download "$@" ;;
-    p|pull)       shift; cmd_pull "$@" ;;
+    push)         shift; cmd_push "$@" ;;
     help|-h|--help) usage; exit 0 ;;
     bash-completion) shift; cmd_install_completion "$@" ;;
     *)

@@ -65,7 +65,7 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ tar -zcvf Rke2Ops.tar.gz ../Rke2Ops
 # 配置
 ``` bash
 # 上传镜像至 harbor 镜像仓库
-admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl pull cq-moone
+admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl push cq-moone
 
 # 修改 hosts 
 admin@Ubuntu-Desktop:~/Rke2Ops$ vim inventory/cq-moone/hosts
@@ -125,7 +125,7 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 | ---- | ---- | ---- |
 | kube-vip 等待任务重试 90 次超时 | 接口名不符或 nodeSelector 不匹配 | `ip -4 addr` 核对网卡并修正 `kube_vip_interface`；确认节点 label 为 `node-role.kubernetes.io/control-plane=true` |
 | `kubectl get ds` 显示 DESIRED=0 | kube-vip DaemonSet nodeSelector 与节点 label 不匹配 | 检查 manifest 中 `node-role.kubernetes.io/control-plane: "true"`（RKE2 为 `true`，非 kubeadm 的空值） |
-| pull 出现 "No such image" 刷屏 | 清单含未下载的 CNI 镜像（如 cni 改用 cilium） | 已自动按本地已加载镜像过滤，忽略即可；确认 download 的 cni 与 site.yml 一致 |
+| push 出现 "No such image" 刷屏 | 清单含未下载的 CNI 镜像（如 cni 改用 cilium） | 已自动按本地已加载镜像过滤，忽略即可；确认 download 的 cni 与 site.yml 一致 |
 | `docker login` 失败 | Harbor 账号或项目配置错误 | 检查 `global.docker_repo.user/password`；确认 Harbor 已建 `rancher` 项目 |
 | master2/3 报 `Could not find the requested service` | 旧版 systemd 服务名 `rke2_server` 遗留 | 升级 rke2ctl/playbooks 后重跑，服务名统一为 `rke2-server` |
 | download 下载慢/失败 | GitHub 直连受限 | 配置 `download_proxy` 多个加速镜像，空格分隔依次重试 |
@@ -141,7 +141,7 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 | `rke2ctl new <环境名>` | 创建环境（复制模板 + 加密 secrets） |
 | `rke2ctl del <环境名>` | 删除环境（inventory/ 与 packages_rke2/ 同名目录） |
 | `rke2ctl download <环境名>` | 离线下载安装包 + kube-vip 镜像包（外网） |
-| `rke2ctl pull <环境名> [registry]` | 镜像导入私有仓库（内网） |
+| `rke2ctl push <环境名> [registry]` | 镜像导入私有仓库（内网） |
 | `rke2ctl setup <环境名> <all\|ssh-copy\|rke2-server\|rke2-agent>` | 分发公钥 / 部署 master / 部署 worker / 全量部署 |
 | `rke2ctl bash-completion` | 启用 tab 补全 |
 
