@@ -42,14 +42,14 @@ Rke2Ops/
 │   │   ├── secrets.yml         # 配置 sudo 密码
 │   │   ├── site.yml            # 配置 kre2 参数, 包括磁盘分区、网络插件等的启用, kube-vip 设置等文件
 │   └── env/                    # 独立环境: hosts / site.yml / secrets.yml
-└── packages_rke2/env/v1.36.3+rke2r1/amd64/                                       # 离线包 (download 产物, 含 kube-vip 镜像包)
+└── packages_rke2/env/v1.36.3+rke2r1/amd64/   # 离线下载 RKE2 安装包至 packages_rke2/<环境名>/<版本>/<架构>
                                      ├── install.sh                             # RKE2 一键安装脚本
                                      ├── rancher-load-images.sh                 # 镜像导入辅助脚本
                                      ├── rke2.linux-amd64.tar.gz                # RKE2 核心程序包
                                      ├── sha256sum-amd64.txt                    # 全部包 SHA256 校验值
                                      ├── rke2-images-all.linux-amd64.txt        # 全量镜像清单
                                      ├── rke2-images.linux-amd64.tar.gz         # 核心组件 + 默认 CNI 镜像
-                                     ├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包 (按 cni 配置下载)
+                                     ├── rke2-images-cilium.linux-amd64.tar.gz  # CNI 镜像包
                                      └── kube-vip-image-v1.2.3.tar.gz           # kube-vip 镜像包
 
 # 修改需要下载的 rke2 版本
