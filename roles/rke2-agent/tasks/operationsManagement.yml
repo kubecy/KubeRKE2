@@ -15,3 +15,12 @@
   shell: source /home/{{ global.k8s_user.user }}/.bashrc
   args:
     executable: /bin/bash
+
+- name: worker 节点设置 node-role 标签
+  shell: |
+    export KUBECONFIG=/home/{{ global.k8s_user.user }}/.kube/config
+    export PATH=$PATH:{{ global.rke2_data_dir }}/bin
+    kubectl label node {{ item }} node-role.kubernetes.io/worker=true --overwrite
+  loop: "{{ groups['rke2_agent'] }}"
+  delegate_to: "{{ groups['rke2_server'][0] }}"
+  run_once: true

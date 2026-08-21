@@ -28,7 +28,7 @@ global:
   profile: ""                                  ## 基准测试验证系统配置: cis 根据实际情况配置
 
   partition:                                   ## rke2-server、rke2-agent主机磁盘分区
-    enabled: "yes"                             ## 分区开关: yes Or no
+    enabled: "no"                             ## 分区开关: yes Or no
     rke2_data_dir_disk: "sdb"                  ## rke2_data_dir 挂载盘 (nvme0n2 或 sdb, 按用户环境定义)
     kubelet_dir_disk: "sdc"                    ## kubelet_dir 挂载盘 (nvme0n3 或 sdc, 按用户环境定义)
     etcd_dir_disk: "none"                      ## 如果none，则etcd目录不单独挂载。
