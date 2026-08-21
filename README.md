@@ -7,7 +7,7 @@
 <a href="#"><img src="https://img.shields.io/badge/Support‑OS-RedHat%7CRocky%7COpenEuler%7CKylin%7CDebian%7CUbuntu-yellow" /></a>
 
 Rke2Ops 是一款面向 RKE2 多环境、多版本自动化部署运维工具。内置 kube‑vip 一体化方案，零外部负载均衡依赖，一键构建稳定可靠的 Kubernetes 控制平面高可用集群，大幅简化裸金属、离线机房 Kubernetes 高可用落地流程。
-<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/Kube-VIP-RKE2.png">
+<img src="https://github.com/kubecy/Rke2Ops/blob/main/pics/kube-vip-RKE2.png">
 
 ---
 # 快速开始
