@@ -4,6 +4,7 @@
   vars_files:
     - "{{ env_dir }}/secrets.yml"
     - "{{ env_dir }}/site.yml"
+  any_errors_fatal: true
   become: yes
   become_method: sudo
   vars:
