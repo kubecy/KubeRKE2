@@ -71,7 +71,7 @@
   copy: src=sctp.conf dest=/etc/modprobe.d/sctp.conf
 
 ####################################################################################
-## 磁盘分区与挂载 (global.partition: yes 时生效)                                  ###
+## 磁盘分区与挂载                                                                ###
 ####################################################################################
 - name: "磁盘分区与挂载 (global.partition: yes 时生效)"
   block:
@@ -255,9 +255,6 @@
 - name: 配置 RKE2 私有镜像仓库
   template: src=96-k8s-rke2-registries.yml.j2 dest={{ global.rke2_worker_dir }}/registries.yaml
 
-#- name: 配置 RKE2 SERVER 配置文件
-#  template: src=97-k8s-rke2-server-config.yml.j2 dest={{ global.rke2_worker_dir }}/config.yaml
-
 - name: 配置 crictl 的连接配置文件
   template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml
 
@@ -272,7 +269,7 @@
   delegate_to: localhost
   run_once: true
 
-- name: 提示缺少对应架构的离线包
+- name: 缺少对应架构的 RKE2 离线包
   fail:
     msg: "缺少 {{ global.pkg_rke2 }}/{{ env_dir | basename }}/{{ rke2_version }}/{{ rke2_arch_suffix }}/ 下 {{ arch }} 架构的 rke2.linux-{{ rke2_arch_suffix }}.tar.gz, 请先执行 ./rke2ctl download {{ env_dir | basename }}"
   when: not rke2_arch_pkg.stat.exists

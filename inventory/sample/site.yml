@@ -14,11 +14,11 @@ global:
     password: "Harbor123@!"
     disable_default_registry_endpoint: true 
   k8s_user:                    ## 管理 K8S 集群专用用户                            
-    group: kubeuser
+    group: kubeadmin
     gid: 2456
-    user: kubeuser
+    user: kubeadmin
     uid: 2456
-    password: kubeuser123@!
+    password: kubeadmin123@!
   token: "RtMjcuJSVrbVlTBwQwisumREZWtMgH6RiKOXSsMKwAJsvGRaxaMIPOE+U6GKySQj"
   pkg_rke2: "packages_rke2"
   software_dir: /app/rke2                      ## RKE2 二进制包目录
@@ -26,6 +26,7 @@ global:
   rke2_data_dir: /var/lib/rancher/rke2         ## RKE2数据目录: IO 极敏感的场景下把 /var/lib/rancher/rke2/server/db（etcd）单独挂一块 NVMe，/var/lib/rancher/rke2/agent/containerd（镜像）挂大容量盘。
   kubelet_dir: /var/lib/kubelet                ## 用于管理 kubelet 文件的根目录（Pod 卷、emptyDir、插件 socket等）  
   profile: ""                                  ## 基准测试验证系统配置: cis 根据实际情况配置
+
   kube_vip_version: "v1.2.3"                   ## 镜像版本 KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
   kube_vip_interface: "ens160"                 ## 接口
   kube_vip: "192.168.1.110"                    ## VIP
