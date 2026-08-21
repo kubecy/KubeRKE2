@@ -87,22 +87,22 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ansible-vault edit inventory/cq-moone/secrets.ym
 ---
 servers:
   cq-moone-master1:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-master2:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-master3:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
 
   cq-moone-worker1:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-worker2:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-worker3:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-worker4:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
   cq-moone-worker5:
-    sudopass: "MTIzCg=="
+    sudopass: "MXFhekBXU1gxMjNAIQo==="
 ```
 
 # 部署
