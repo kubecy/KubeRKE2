@@ -26,8 +26,9 @@ global:
   rke2_data_dir: /var/lib/rancher/rke2         ## RKE2数据目录: IO 极敏感的场景下把 /var/lib/rancher/rke2/server/db（etcd）单独挂一块 NVMe，/var/lib/rancher/rke2/agent/containerd（镜像）挂大容量盘。
   kubelet_dir: /var/lib/kubelet                ## 用于管理 kubelet 文件的根目录（Pod 卷、emptyDir、插件 socket等）  
   profile: ""                                  ## 基准测试验证系统配置: cis 根据实际情况配置
-  partition:                                   ## yes：rke2-server、rke2-agent主机磁盘分区, no: 不分区 (no 时以下子键均不生效)
-    enabled: "yes"                             ## 分区开关
+
+  partition:                                   ## rke2-server、rke2-agent主机磁盘分区
+    enabled: "yes"                             ## 分区开关: yes Or no
     rke2_data_dir_disk: "nvme0n2"              ## rke2_data_dir 挂载盘 (nvme0n2 或 sdb, 按用户环境定义)
     kubelet_dir_disk: "nvme0n3"                ## kubelet_dir 挂载盘 (nvme0n3 或 sdc, 按用户环境定义)
     etcd_dir_disk: "none"                      ## 如果none，则etcd目录不单独挂载。
@@ -39,10 +40,10 @@ global:
 ##============================================================================= 
 rke2_server:
   kube_vip:
-    enabled: "yes"  
-    kube_vip_version: "v1.2.3"                   ## 镜像版本 KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
-    kube_vip_interface: "ens160"                 ## 接口
-    virtual_iP: "192.168.1.110"                  ## VIP
+    enabled: "yes"                             ## kube-vip开关: yes Or no
+    kube_vip_version: "v1.2.3"                 ## 镜像版本 KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
+    kube_vip_interface: "ens160"               ## 接口
+    virtual_iP: "192.168.1.110"                ## VIP
 
   db:
     user: etcd
@@ -84,7 +85,6 @@ rke2_server:
   write_kubeconfig: /etc/rancher/rke2/rke2.yaml
   write_kubeconfig_mode: "0644"
   
-
   control_plane_resource_requests:   ## 控制平面资源请求, 根据实际集群规模配置, 
     - kube-apiserver-cpu=500m
     - kube-apiserver-memory=1024M
