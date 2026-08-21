@@ -1,0 +1,28 @@
+---
+- name: 部署 rke2-server 服务
+  hosts: rke2_server
+  vars_files:
+    - "{{ env_dir }}/secrets.yml"
+    - "{{ env_dir }}/site.yml"
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  vars:
+    ansible_become_pass: "{{ servers[inventory_hostname].sudopass | b64decode }}"
+  roles:
+    - prepare
+    - rke2-server
+
+- name: 部署 rke2-agent 服务
+  hosts: rke2_agent
+  vars_files:
+    - "{{ env_dir }}/secrets.yml"
+    - "{{ env_dir }}/site.yml"
+  any_errors_fatal: true
+  become: yes
+  become_method: sudo
+  vars:
+    ansible_become_pass: "{{ servers[inventory_hostname].sudopass | b64decode }}"
+  roles:
+    - prepare
+    - rke2-agent

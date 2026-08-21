@@ -344,7 +344,7 @@ cmd_setup() {
 
   local -a playbooks
   if [[ "${node_type}" == "all" ]]; then
-    playbooks=("rke2-server.yml" "rke2-agent.yml")
+    playbooks=("all.yml")
   else
     playbooks=("${node_type}.yml")
   fi

@@ -30,6 +30,7 @@ Encryption successful
 Rke2Ops/
 ├── rke2ctl                     # 总控脚本: 环境, 下载, 推送, 部署, 补全
 ├── playbooks/
+│   ├── all.yml                 # 一键部署 master + worker (一次输入 vault 密码)
 │   ├── rke2-server.yml         # 部署 master
 │   └── rke2-agent.yml          # 部署 worker
 ├── roles/
@@ -143,8 +144,8 @@ admin@Ubuntu-Desktop:~/Rke2Ops$ ./rke2ctl setup cq-moone all
 | `rke2ctl del <环境名>` | 删除环境（inventory 与 packages_rke2 同名目录） |
 | `rke2ctl download <环境名>` | 离线下载安装包 + kube-vip 镜像包|
 | `rke2ctl push <环境名> [registry]` | 镜像导入私有仓库（内网） |
-| `rke2ctl setup <环境名> <all>` | 分发公钥 |
-| `rke2ctl setup <环境名> <rke2-server\|rke2-agent\|all>` | 部署 master, 部署 worker, 全量部署 |
+| `rke2ctl setup <环境名> <ssh-copy>` | 分发公钥 |
+| `rke2ctl setup <环境名> <rke2-server\|rke2-agent\|all>` | 部署 master, 部署 worker, 全量部署 (一次输入 vault 密码) |
 
 # 参考
 
