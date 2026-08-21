@@ -62,14 +62,14 @@ spec:
       serviceAccountName: kube-vip
       containers:
         - name: kube-vip
-          image: "{{ global.docker_repo.host }}/rancher/kube-vip-kube-vip:{{ global.kube_vip_version }}"
+          image: "{{ global.docker_repo.host }}/rancher/kube-vip-kube-vip:{{ rke2_server.kube_vip.kube_vip_version }}"
           imagePullPolicy: IfNotPresent
           args: ["manager"]
           env:
             - name: address
-              value: "{{ global.kube_vip }}"
+              value: "{{ rke2_server.kube_vip.virtual_iP }}"
             - name: vip_interface
-              value: "{{ global.kube_vip_interface }}"
+              value: "{{ rke2_server.kube_vip.kube_vip_interface }}"
             - name: vip_subnet
               value: "32"
             - name: vip_arp

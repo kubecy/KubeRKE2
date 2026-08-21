@@ -34,7 +34,7 @@ Rke2Ops/
 │   └── rke2-agent.yml          # 部署 worker
 ├── roles/
 │   ├── prepare/                # 基础初始化 (用户, 目录, 离线包分发)
-│   ├── rke2-server/            # 含 kube-vip.yaml.j2 (HA 清单)
+│   ├── rke2-server/            # 含 98-kube-vip.yaml.j2 (HA 清单)
 │   └── rke2-agent/
 ├── inventory/
 │   ├── sample/                 # 环境模板 (复制即得新环境)

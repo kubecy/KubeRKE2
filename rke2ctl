@@ -103,6 +103,24 @@ read_docker_repo() {
   printf -v "${pass_var}" '%s' "${pass_val}"
 }
 
+read_kube_vip() {
+  local site_file="$1" enabled_var="$2" version_var="$3"
+  local enabled_val="" version_val="" line in_block=0
+  local re_key="^[[:space:]]{2}[A-Za-z_][A-Za-z0-9_]*:"
+  local re_enabled="^[[:space:]]{4}enabled:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  local re_version="^[[:space:]]{4}kube_vip_version:[[:space:]]*[\"']?([^\"'[:space:]]+)[\"']?"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ${re_key} ]]; then in_block=0; fi
+    if [[ "${line}" =~ ^[[:space:]]{2}kube_vip:[[:space:]]*$ ]]; then in_block=1; continue; fi
+    if [[ "${in_block}" -eq 1 ]]; then
+      [[ "${line}" =~ ${re_enabled} ]] && enabled_val="${BASH_REMATCH[1]}"
+      [[ "${line}" =~ ${re_version} ]] && version_val="${BASH_REMATCH[1]}"
+    fi
+  done < "${site_file}"
+  printf -v "${enabled_var}" '%s' "${enabled_val}"
+  printf -v "${version_var}" '%s' "${version_val}"
+}
+
 parse_hosts() {
   local hosts_file="$1"
   awk '
@@ -236,12 +254,14 @@ cmd_new() {
   cat <<EOF
 ============================================================
 环境 ${env_name} 创建完成, 后续步骤:
-  1. vim ${env_dir}/hosts                       配置主机清单
-  2. vim ${env_dir}/site.yml                    修改环境变量
-  3. ansible-vault edit ${env_dir}/secrets.yml  填入各主机 sudo 密码(base64)
-  4. ./rke2ctl setup ${env_name} ssh-copy       自动分发 SSH 公钥
-  5. ./rke2ctl setup ${env_name} rke2-server    部署 k8s-master
-  6. ./rke2ctl setup ${env_name} rke2-agent     部署 k8s-work
+
+  1. ./rke2ctl download ${env_name}             下载 RKE2 离线包
+  2. vim ${env_dir}/hosts                       配置主机清单
+  3. vim ${env_dir}/site.yml                    修改环境变量
+  4. ansible-vault edit ${env_dir}/secrets.yml  填入各主机 sudo 密码(base64)
+  5. ./rke2ctl setup ${env_name} ssh-copy       自动分发 SSH 公钥
+  6. ./rke2ctl setup ${env_name} rke2-server    部署 k8s-master
+  7. ./rke2ctl setup ${env_name} rke2-agent     部署 k8s-work
 ============================================================
 EOF
 }
@@ -550,6 +570,7 @@ cmd_download() {
   local env_name="$1"
   local version arch_raw cni
   local arch_linux arch_short version_urlsafe dest_dir site_file download_proxy
+  local kv_enabled kv_version
 
   require_valid_env "${env_name}"
   site_file="${INVENTORY_DIR}/${env_name}/site.yml"
@@ -564,7 +585,7 @@ cmd_download() {
   site_get_proxy "${site_file}" download_proxy
   site_get_field "${site_file}" '^[[:space:]]*cni' cni
   cni="$(printf '%s' "${cni}" | tr 'A-Z' 'a-z')"
-  site_get_field "${site_file}" '^[[:space:]]\{2\}kube_vip_version' kube_vip_version
+  read_kube_vip "${site_file}" kv_enabled kv_version
   logger info "环境 ${env_name} 配置:"\
     "rke2_version=${version:-空} arch=${arch_raw:-空} cni=${cni:-none}"
 
@@ -646,42 +667,49 @@ cmd_download() {
   verify_checksums "${checksum_file}" "${dest_dir}" "${arch_linux}" "${files[@]}"
   failed=$?
 
-  if [[ -n "${kube_vip_version}" ]]; then
-    local kv_image="ghcr.m.daocloud.io/kube-vip/kube-vip:${kube_vip_version}"
-    local kv_tag="rancher/kube-vip-kube-vip:${kube_vip_version}"
-    local kv_tarball="${dest_dir}/kube-vip-image-${kube_vip_version}.tar.gz"
-    local kv_list="${dest_dir}/rke2-images-all.${arch_linux}.txt"
-    if [[ ! -s "${kv_tarball}" ]]; then
-      require_cmd docker "请先安装 docker"
-      local kv_sudo_cmd=""
-      if [[ "$(id -u)" -ne 0 ]] && ! docker info >/dev/null 2>&1; then
-        require_cmd sudo "当前用户无 docker 权限且未安装 sudo"
-        kv_sudo_cmd="sudo"
+  case "${kv_enabled}" in
+    yes|YES|true|TRUE|1|on|ON)
+      if [[ -z "${kv_version}" ]]; then
+        logger warn "site.yml 的 rke2_server.kube_vip.enabled 为 yes, 但未配置 kube_vip_version, 跳过 kube-vip 镜像下载"
+      else
+        local kv_image="ghcr.m.daocloud.io/kube-vip/kube-vip:${kv_version}"
+        local kv_tag="rancher/kube-vip-kube-vip:${kv_version}"
+        local kv_tarball="${dest_dir}/kube-vip-image-${kv_version}.tar.gz"
+        local kv_list="${dest_dir}/rke2-images-all.${arch_linux}.txt"
+        if [[ ! -s "${kv_tarball}" ]]; then
+          require_cmd docker "请先安装 docker"
+          local kv_sudo_cmd=""
+          if [[ "$(id -u)" -ne 0 ]] && ! docker info >/dev/null 2>&1; then
+            require_cmd sudo "当前用户无 docker 权限且未安装 sudo"
+            kv_sudo_cmd="sudo"
+          fi
+          logger info "拉取 kube-vip 镜像: ${kv_image}"
+          if ! ${kv_sudo_cmd} docker pull --platform "linux/${arch_short}" "${kv_image}"; then
+            logger error "docker pull 失败: ${kv_image} (请确认 ghcr.m.daocloud.io 可达或检查 kube_vip_version)"
+            exit 1
+          fi
+          ${kv_sudo_cmd} docker tag "${kv_image}" "${kv_tag}"
+          logger info "导出镜像: $(basename "${kv_tarball}")"
+          if ! ${kv_sudo_cmd} docker save "${kv_tag}" | gzip > "${kv_tarball}"; then
+            logger error "docker save 失败: $(basename "${kv_tarball}")"
+            rm -f "${kv_tarball}"
+            exit 1
+          fi
+        else
+          logger info "已存在, 跳过下载: $(basename "${kv_tarball}")"
+        fi
+        if ! grep -qF "${kv_tag}" "${kv_list}"; then
+          printf '%s\n' "${kv_tag}" >> "${kv_list}"
+          logger info "镜像清单已追加: ${kv_tag}"
+        else
+          logger info "镜像清单已包含: ${kv_tag}"
+        fi
       fi
-      logger info "拉取 kube-vip 镜像: ${kv_image}"
-      if ! ${kv_sudo_cmd} docker pull --platform "linux/${arch_short}" "${kv_image}"; then
-        logger error "docker pull 失败: ${kv_image} (请确认 ghcr.m.daocloud.io 可达或检查 kube_vip_version)"
-        exit 1
-      fi
-      ${kv_sudo_cmd} docker tag "${kv_image}" "${kv_tag}"
-      logger info "导出镜像: $(basename "${kv_tarball}")"
-      if ! ${kv_sudo_cmd} docker save "${kv_tag}" | gzip > "${kv_tarball}"; then
-        logger error "docker save 失败: $(basename "${kv_tarball}")"
-        rm -f "${kv_tarball}"
-        exit 1
-      fi
-    else
-      logger info "已存在, 跳过下载: $(basename "${kv_tarball}")"
-    fi
-    if ! grep -qF "${kv_tag}" "${kv_list}"; then
-      printf '%s\n' "${kv_tag}" >> "${kv_list}"
-      logger info "镜像清单已追加: ${kv_tag}"
-    else
-      logger info "镜像清单已包含: ${kv_tag}"
-    fi
-  else
-    logger warn "site.yml 未配置 global.kube_vip_version, 跳过 kube-vip 镜像下载"
-  fi
+      ;;
+    *)
+      logger info "site.yml 的 rke2_server.kube_vip.enabled 非 yes 或未配置, 跳过 kube-vip 镜像下载"
+      ;;
+  esac
 
   if [[ "${failed}" -eq 0 ]]; then
     logger info "全部下载完成并校验通过: ${dest_dir}"
