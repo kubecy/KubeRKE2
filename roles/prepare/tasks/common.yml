@@ -7,7 +7,7 @@
   register: host_cgroup_type
   when: (rke2_version.split('+')[0].split('.')[1] | int) >= 35
 
-- name: 校验 RKE2 >= v1.35 要求 CGroup 必须为 cgroup2fs
+- name: 校验 K8S >= v1.35 要求 CGroup 必须为 cgroup2fs
   fail:
     msg: "主机 {{ inventory_hostname }} 当前 CGroup 版本为 {{ host_cgroup_type.stdout }} (cgroup v1)，RKE2 {{ rke2_version }} (>= v1.35) 要求 cgroup v2 (cgroup2fs)，请升级内核并启用 cgroup v2 后重新部署"
   when:
