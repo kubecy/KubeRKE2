@@ -11,7 +11,7 @@ cq-moone-master3 ansible_host=192.168.1.63
 
 ## worker 节点
 [rke2_agent]
-cq-moone-worker1 ansible_host=192.168.1.71
-#cq-moone-worker2 ansible_host=192.168.1.72
-#cq-moone-worker3 ansible_host=192.168.1.73
+#cq-moone-worker1 ansible_host=192.168.1.71
+cq-moone-worker2 ansible_host=192.168.1.72
+cq-moone-worker3 ansible_host=192.168.1.73
 

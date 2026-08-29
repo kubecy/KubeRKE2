@@ -17,6 +17,8 @@
     executable: /bin/bash
 
 - name: worker 节点设置 node-role 标签
+  vars:
+    ansible_become_pass: "{{ servers[groups['rke2_server'][0]].sudopass | b64decode }}"
   shell: |
     export KUBECONFIG=/home/{{ global.k8s_user.user }}/.kube/config
     export PATH=$PATH:{{ global.rke2_data_dir }}/bin
