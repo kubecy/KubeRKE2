@@ -46,10 +46,16 @@
     - rke2_server.disable_kube_proxy | default(false) | bool 
     - rke2_server.kubeproxyreplacement | default(false) | bool
 
-- name: 部署 rke2‑coredns 自定义配置 HelmChartConfig 清单
+- name: 部署 rke2‑coredns 配置 HelmChartConfig 清单
   template:
     src: 94-rke2-coredns-config.yaml.j2
     dest: "{{ global.rke2_data_dir }}/server/manifests/94-rke2-coredns-config.yaml"
+
+- name: 部署 rke2‑traefik 配置 HelmChartConfig 清单
+  template:
+    src: 95-rke2-traefik-config.yaml.j2
+    dest: "{{ global.rke2_data_dir }}/server/manifests/95-rke2-traefik-config.yaml"
+  when: rke2_server.ingress_controller == "traefik" 
 
 - name: 部署 kube-vip 控制面 HA 清单
   template:
