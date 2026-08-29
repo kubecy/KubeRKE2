@@ -233,6 +233,14 @@
 - name: 配置 RKE2 私有镜像仓库
   template: src=96-k8s-rke2-registries.yml.j2 dest={{ global.rke2_worker_dir }}/registries.yaml
 
+- name: 写入私有镜像仓库域名解析 ({{ global.docker_repo.host }} -> {{ global.docker_repo.host_ip }})
+  lineinfile:
+    path: /etc/hosts
+    regexp: "^{{ global.docker_repo.host_ip }} +{{ global.docker_repo.host }}$"
+    line: "{{ global.docker_repo.host_ip }} {{ global.docker_repo.host }}"
+    create: yes
+  when: global.docker_repo.host_ip | default('') | length > 0
+
 - name: 配置 crictl 的连接配置文件
   template: src=98-k8s-rke2-crictl.yml.j2 dest=/etc/crictl.yaml
 

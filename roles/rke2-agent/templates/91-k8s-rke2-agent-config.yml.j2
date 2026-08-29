@@ -17,7 +17,9 @@ kubelet-arg:
   - {{ kubelet_arg }}
 {% endfor %}
 
+{% if not (rke2_server.disable_kube_proxy and rke2_server.kubeproxyreplacement) %}
 kube-proxy-arg:
 {% for kube_proxy_arg in rke2_agent.kube_proxy_arg %}
   - {{ kube_proxy_arg }}
 {% endfor %}
+{% endif %}

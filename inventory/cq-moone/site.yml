@@ -10,9 +10,10 @@ global:
   ansible_dir: "{{ playbook_dir }}/.."
   docker_repo:
     host: "harbor.kubecy.com"  ## 私有镜像仓库
+    host_ip: "192.168.1.150"   ## 镜像仓库 IP (内网域名需写入 /etc/hosts 时配置, 留空跳过)
     user: "admin"
     password: "Harbor123@!"
-    disable_default_registry_endpoint: true 
+    disable_default_registry_endpoint: true
   k8s_user:                    ## 管理 K8S 集群专用用户                            
     group: kubeadmin
     gid: 2456
@@ -28,22 +29,23 @@ global:
   profile: ""                                  ## 基准测试验证系统配置: cis 根据实际情况配置
 
   partition:                                   ## rke2-server、rke2-agent主机磁盘分区
-    enabled: "no"                             ## 分区开关: yes Or no
+    enabled: false                             ## 分区开关: true Or false
     rke2_data_dir_disk: "sdb"                  ## rke2_data_dir 挂载盘 (nvme0n2 或 sdb, 按用户环境定义)
     kubelet_dir_disk: "sdc"                    ## kubelet_dir 挂载盘 (nvme0n3 或 sdc, 按用户环境定义)
     etcd_dir_disk: "none"                      ## 如果none，则etcd目录不单独挂载。
     format_type: "xfs"                         ## 分区文件系统类型 (xfs/ext4)
 
+  ha_ip: "192.168.1.110"
 
 ##============================================================================= 
 ##                                K8S MASTER                                 ##
 ##============================================================================= 
 rke2_server:
   kube_vip:
-    enabled: "yes"                             ## kube-vip开关: yes Or no
+    enabled: true                              ## kube-vip开关: true Or false
     kube_vip_version: "v1.2.3"                 ## 镜像版本 KVVERSION=$(curl -sL https://api.github.com/repos/kube-vip/kube-vip/releases | jq -r ".[0].name")
-    kube_vip_interface: "ens33"                ## 接口: ens33、ens160、eth0
-    virtual_iP: "192.168.1.110"                ## VIP
+    kube_vip_interface: "ens33"                ## 接口
+    virtual_ip: "{{ global.ha_ip }}"           ## Kube-VIP
 
   db:
     user: etcd
@@ -57,7 +59,8 @@ rke2_server:
     etcd_snapshot_compress: true                    ## 压缩 etcd 快照
 
 
-  disable_kube_proxy: false               ## 禁用 kube-proxy, 默认是：flase, 如果开启, 修改为：true 即可
+  disable_kube_proxy: true                ## 禁用 kube-proxy, 默认是：false, 如果开启, 修改为：true 即可
+  kubeproxyreplacement: true              ## 完全替代 kube‑proxy
   cni: "cilium"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
   ingress_controller: "none"              ## 部署的 Ingress Controller
   cluster_cidr: "10.244.0.0/16"           ## Pod IP 的 IPv4/IPv6 网络 CIDR
@@ -67,7 +70,7 @@ rke2_server:
   cluster_domain: "cluster.local"         ## Kubernetes 集群的 DNS 域后缀配置项
 
   tls_san:
-    - "{{ rke2_server.kube_vip.virtual_iP }}"  ## HA_VIP, 必须在第一行
+    - "{{ global.ha_ip }}"     ## HA_VIP, 必须在第一行
     - "rke2-vip.kubecy.com"    ## 配置域名
     - 192.168.1.61             ## RKE2 SERVER1
     - 192.168.1.62             ## RKE2 SERVER2

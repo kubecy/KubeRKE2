@@ -673,7 +673,7 @@ cmd_download() {
         logger warn "site.yml 的 rke2_server.kube_vip.enabled 为 yes, 但未配置 kube_vip_version, 跳过 kube-vip 镜像下载"
       else
         local kv_image="ghcr.m.daocloud.io/kube-vip/kube-vip:${kv_version}"
-        local kv_tag="rancher/kube-vip-kube-vip:${kv_version}"
+        local kv_tag="rancher/kube-vip:${kv_version}"
         local kv_tarball="${dest_dir}/kube-vip-image-${kv_version}.tar.gz"
         local kv_list="${dest_dir}/rke2-images-all.${arch_linux}.txt"
         if [[ ! -s "${kv_tarball}" ]]; then

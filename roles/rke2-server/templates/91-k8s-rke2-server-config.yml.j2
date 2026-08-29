@@ -66,7 +66,9 @@ etcd-arg:
   - {{ etcd_arg }}
 {% endfor %}
 
+{% if not (rke2_server.disable_kube_proxy and rke2_server.kubeproxyreplacement) %}
 kube-proxy-arg:
-{% for kube_proxy_arg in rke2_server.kube_proxy_arg %}
+{% for kube_proxy_arg in rke2_agent.kube_proxy_arg %}
   - {{ kube_proxy_arg }}
 {% endfor %}
+{% endif %}

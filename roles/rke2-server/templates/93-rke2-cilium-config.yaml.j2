@@ -1,0 +1,11 @@
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-cilium
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    kubeProxyReplacement: {{ rke2_server.kubeproxyreplacement }}
+    k8sServiceHost: {{ rke2_server.tls_san[0] }}
+    k8sServicePort: 6443
