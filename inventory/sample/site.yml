@@ -62,7 +62,6 @@ rke2_server:
   disable_kube_proxy: true                ## 禁用 kube-proxy, 默认是：false, 如果开启, 修改为：true 即可
   kubeproxyreplacement: true              ## 完全替代 kube‑proxy
   cni: "cilium"                           ## 部署的 CNI 插件, 可选值: none, calico, canal, cilium, multus 作为第一个值以启用 multus 元插件
-  ingress_controller: "none"              ## 部署的 Ingress Controller
   cluster_cidr: "10.244.0.0/16"           ## Pod IP 的 IPv4/IPv6 网络 CIDR
   service_cidr: "10.96.0.0/16"            ## 服务 IP 的 IPv4/IPv6 网络 CIDR 
   cluster_dns: "10.96.0.10"               ## CoreDNS 服务的 IPv4 集群 IP 地址, 在服务 CIDR 范围内
@@ -79,9 +78,11 @@ rke2_server:
   node_taint:                  ## MASTER 注册带有污点 
     - "node-role.kubernetes.io/control-plane=true:NoSchedule"
 
-  disable_cloud_controller: true  ## 禁用 rke2 默认云控制器管理器
+  ingress_controller: "traefik"      ## 部署的 Ingress Controller, 默认：traefik, 另外参数: none, ingress-nginx
+    
+  disable_cloud_controller: true     ## 禁用 rke2 默认云控制器管理器
 
-  disable:                        ## 禁止部署已打包的组件, 有效项: rke2-coredns, rke2-ingress-nginx, rke2-metrics-server
+  disable:                           ## 禁止部署已打包的组件, 有效项: rke2-coredns, rke2-ingress-nginx, rke2-metrics-server
     - rke2-ingress-nginx
     - rke2-metrics-server 
 
